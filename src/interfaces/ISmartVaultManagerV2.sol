@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.17;
+pragma solidity ^0.8.22;
 
 interface ISmartVaultManagerV2 {
     function weth() external view returns (address);

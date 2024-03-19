@@ -30,6 +30,8 @@ contract SmartVaultManagerV5 is
 {
     using SafeERC20 for IERC20;
 
+    uint256 public constant HUNDRED = 1e5;
+
     address public protocol;
     address public liquidator;
     address public euros;

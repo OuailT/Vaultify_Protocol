@@ -16,12 +16,12 @@ import {ISmartVaultIndex} from "./interfaces/ISmartVaultIndex.sol";
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 
-/// @title SmartVaultManagerV5
+/// @title SmartVaultManager
 /// OUAIL Allows the vault manager to set important  state variables, generate NFT metadata of the vault, deploy a new smart vault.
 /// @notice Contract managing vault deployments, controls admin data which dictates behavior of Smart Vaults.
 /// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
 
-contract SmartVaultManagerV5 is
+contract SmartVaultManager is
     ISmartVaultManager,
     ISmartVaultManagerV2,
     Initializable,
@@ -55,6 +55,11 @@ contract SmartVaultManagerV5 is
         uint256 mintFeeRate;
         uint256 burnFeeRate;
         ISmartVault.Status status;
+    }
+
+    modifier onlyLiquidator() {
+        require(msg.sender == liquidator, "err-invalid-liquidator");
+        _;
     }
 
     function initialize() public initializer {}
@@ -131,6 +136,8 @@ contract SmartVaultManagerV5 is
                 vaultStatus
             );
     }
+
+    // Liquidate vault(); todo later;
 
     // setter functions //
     function totalSupply() external view returns (uint256) {

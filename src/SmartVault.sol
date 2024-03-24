@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IEUROs} from "./interfaces/IEUROs.sol";
 import {IPriceCalculator} from "./interfaces/IPriceCalculator.sol";
 import {ISmartVault} from "./interfaces/ISmartVault.sol";
-import {ISmartVaultManagerV3} from "./interfaces/ISmartVaultManagerV3.sol";
+import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
 import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
 import {ITokenManager} from "./interfaces/ITokenManager.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
@@ -29,8 +29,9 @@ contract SmartVault is ISmartVault {
 
     // State variables
     address public owner; ///< Owner of the Smart Vault.
-    uint256 private vaultEurosMinted; ///< Amount of EUROs minted in this vault.
+    uint256 private mintedEuros; ///< Amount of EUROs minted in this vault.
     bool private liquidated; ///< Flag indicating if the vault has been liquidated.
+    ISmartVaultManager private smartVaultManager;
 
     /// @notice Initializes a new Smart Vault.
     /// @dev Sets initial values for the Smart Vault.
@@ -42,15 +43,16 @@ contract SmartVault is ISmartVault {
     constructor(
         bytes32 _native,
         address _manager,
-        address _onwer,
+        address _owner,
         address _euros,
         address _priceCalculator
     ) {
         NATIVE = _native;
-        owner = _onwer;
+        owner = _owner;
         manager = _manager;
         EUROs = IEUROs(_euros);
         calculator = IPriceCalculator(_priceCalculator);
+        smartVaultManager = ISmartVaultManager(_manager);
     }
 
     // The vault owner
@@ -61,11 +63,22 @@ contract SmartVault is ISmartVault {
         _;
     }
 
+    modifier ifNotLiquidated() {
+        if (liquidated) revert VaultifyErrors.LiquidatedVault(address(this));
+        _;
+    }
+
+    modifier ifEurosMinted(uint256 _amount) {
+        if (mintedEuros < _amount)
+            revert VaultifyErrors.InsufficientEurosMinted(_amount);
+        _;
+    }
+
     /// @notice Retrieves the Token Manager contract.
     /// @dev Calls the manager contract to get the Token Manager's address.
     /// @return The Token Manager contract.
     function getTokenManager() private view returns (ITokenManager) {
-        return ITokenManager(ISmartVaultManagerV3(manager).tokenManager());
+        return ITokenManager(smartVaultManager.tokenManager());
     }
 
     /// @notice Calculates the total collateral value in EUROs within the vault.
@@ -76,12 +89,55 @@ contract SmartVault is ISmartVault {
         ITokenManager.Token[] memory acceptedTokens = getTokenManager()
             .getAcceptedTokens();
         for (uint256 i; acceptedTokens.length; i++) {
-            ITokenManager.Token memory token = getAcceptedTokens[i];
+            ITokenManager.Token memory token = acceptedTokens[i];
             euro += calculator.tokenToEuroAvg(
                 token,
                 getAssetBalance(token.symbol, token.addr)
             );
         }
+    }
+
+    // Mininmum amount out that user can get out of the swap
+    function calculateMinimimAmountOut(
+        bytes32 _inTokenSymbol,
+        bytes32 _outTokenSymbol,
+        uint256 _amount
+    ) private view returns (uint256) {
+        // The percentage of minted token(borrowed token) that must be backed by collateral
+        // to keep vault collatalized
+        uint256 requiredCollateralValue = (mintedEuros *
+            ISmartVaultManager().collateralRate()) /
+            ISmartVaultManager().HUNDRED_PRC();
+
+        // The amount of collateral held in the vault in EUROs after the swap
+        uint256 collateralValueMinusSwapValue = euroCollateral() -
+            calculator.tokenToEur(getToken(_inTokenSymbol), _amount);
+
+        // Before swap make sure that the vault remains collateralized after swap:
+        // If collateralValueMinusSwapValue >= requiredCollateralValue = Vault/address(this) remain collateralized after receiving tokenOut.
+        // else: The Vault/contract must receive from the swap at least a minimumOut to keep vault collateralized.
+        return
+            collateralValueMinusSwapValue >= requiredCollateralValue
+                ? 0
+                : calculator.euroToToken(
+                    getToken(_outTokenSymbol),
+                    requiredCollateralValue - collateralValueMinusSwapValue
+                );
+    }
+
+    // Get token address by it token
+    function getToken(
+        bytes32 _symbol
+    ) private view returns (ITokenManager.Token memory _token) {
+        ITokenManager.Token[] memory tokens = getTokenManager()
+            .getAcceptedTokens();
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i].symbol == _symbol) _token = tokens[i];
+        }
+
+        if (_token.symbol == bytes32(0))
+            revert VaultifyErrors.InvalidTokenSymbol();
     }
 
     function getAssetBalance(
@@ -93,8 +149,167 @@ contract SmartVault is ISmartVault {
             : IERC20(addr).balanceOf(address(this));
     }
 
+    // Max EUROS token to mint based on the deposited collateral provided In the vault
+    function MaxMintableEuros() internal view returns (uint256) {
+        return
+            (euroCollateral() * smartVaultManager.HUNDRED_PRC()) /
+            smartVaultManager.collateralRate();
+    }
 
-    function MaxMintableEuros() internal view returns(uint256) {
-        returns 
+    // Will return true if the the vault is fully coll
+    function fullyCollateralised(
+        uint256 _amount
+    ) private view returns (uint256) {
+        mintedEuros + _amount <= MaxMintableEuros();
+    }
+
+    function borrowMint(
+        uint256 _amount,
+        address _to
+    ) external ifNotLiquidated onlyVaultOwner {
+        // Get the borrow/mint Euro Fee
+        uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
+            smartVaultManager.HUNDRED_PRC();
+        if (!fullyCollateralised(_amount)) {
+            revert VaultifyErrors.UnderCollateralisedVault(address(this));
+        }
+
+        mintedEuros += _amount;
+        EUROs.mint(_to, _amount - fee);
+        // Fees goes to the vault liquidator
+        EUROs.mint(smartVaultManager.liquidator(), fee);
+        emit VaultifyEvents.EUROsMinted(_to, _amount - fee, fee);
+    }
+
+    function burnEuros(uint256 _amount) external ifEurosMinted(_amount) {
+        // Check if this contract has enough allowance of euro tokens to burn;
+        bool euroApproved = IERC20(EUROs).allowance(
+            msg.sender,
+            address(this)
+        ) >= _amount;
+
+        if (!euroApproved) revert VaultifyErrors.NotEnoughAllowance(_amount);
+
+        uint256 fee = (_amount * smartVaultManager.burnFeeRate()) /
+            smartVaultManager.HUNDRED_PRC();
+
+        mintedEuros -= _amount;
+        EUROs.burn(msg.sender, _amount - fee);
+
+        // Execute approve function in the context of the caller msg.sender to approve this contract
+        // to spend/transfer the fees to the liquidator
+        (bool succ, ) = address(EUROs).delegatecall(
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                address(this),
+                fee
+            )
+        );
+
+        if (!succ) revert VaultifyErrors.DelegateCallFailed();
+
+        IERC20(address(EUROs)).safeTransferFrom(
+            msg.sender,
+            smartVaultManager.liquidator(),
+            fee
+        );
+
+        emit VaultifyEvents.EUROsBurned(_amount, fee);
+    }
+
+    function getSwapAddressFor(bytes32 _symbol) private view returns (address) {
+        ITokenManager.Token memory _token = getToken(_symbol);
+        return
+            _token.addr == address(0) ? smartVaultManager.weth() : _token.addr;
+    }
+
+    function executeNativeSwapAndFee(
+        ISwapRouter.ExactInputSingleParams memory _params,
+        uint256 _swapFee
+    ) private returns (uint256 amountOut) {
+        // Send fees to liquidator
+        (bool succ, ) = payable(smartVaultManager.liquidator()).call{
+            value: _swapFee
+        }("");
+        if (!succ) revert VaultifyErrors.SwapFeeNativeFailed();
+
+        // Execute The swap
+        ISwapRouter(smartVaultManager.swapRouter2()).exactInputSingle{
+            value: _params.amountIn
+        }(_params);
+
+        emit VaultifyEvents.NativeSwapExecuted(
+            _params.amountIn,
+            _swapFee,
+            amountOut
+        );
+    }
+
+    function executeERC20SwapAndFee(
+        ISwapRouter.ExactInputSingleParams memory _params,
+        uint256 _swapFee
+    ) private returns (uint256 amountOut) {
+        // Send fees to liquidator
+        IERC20(_params.tokenIn).safeTransfer(
+            smartVaultManager.liquidator(),
+            _swapFee
+        );
+
+        // approve the router to spend amountin on the vault behalf to conduct the swap
+        IERC20(_params.tokenIn).safeApprove(
+            smartVaultManager.swapRouter2(),
+            _params.amountIn
+        );
+
+        // Execute the Swap
+        amountOut = ISwapRouter(smartVaultManager.swapRouter2())
+            .exactInputSingle(_params);
+
+        // If user Swap AToken/WETH then we convert WETH to ETH
+        IWETH weth = IWETH(smartVaultManager.weth());
+
+        // Convert potentially received weth to ETH
+        uint256 wethBalance = weth.balanceOf(address(this));
+        if (wethBalance > 0) weth.withdraw(wethBalance);
+
+        emit VaultifyEvents.ERC20SwapExecuted(
+            _params.amountIn,
+            _swapFee,
+            amountOut
+        );
+    }
+
+    function swap(
+        bytes32 _inTokenSybmol,
+        bytes32 _outTokenSymbol,
+        uint256 _amount
+    ) external onlyVaultOwner {
+        // Calculate the fee swap
+        uint256 swapFee = (_amount * smartVaultManager.swapFee()) /
+            smartVaultManager.HUNDRED_PRC();
+
+        address inToken = getSwapAddressFor(_inTokenSybmol);
+
+        uint256 minimumAmountOut = calculateMinimimAmountOut(
+            _inTokenSybmol,
+            _outTokenSymbol,
+            _amount
+        );
+
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: inToken,
+                tokenOut: getSwapAddressFor(_outTokenSymbol),
+                fee: 3000,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: _amount - swapFee,
+                amountOutMinimum: minimumAmountOut,
+                sqrtPriceLimitX96: 0
+            });
+
+        inToken == smartVaultManager.weth()
+            ? executeNativeSwapAndFee(params, swapFee)
+            : executeERC20SwapAndFee(params, swapFee);
     }
 }

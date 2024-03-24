@@ -25,15 +25,15 @@ library VaultifyEvents {
     /// @notice Emitted when EUROs are burned.
     event EUROsBurned(uint256 amount, uint256 fee);
 
-    constructor(
-        bytes32 _native,
-        address _manager,
-        address _onwer,
-        address _euros,
-        address _priceCalculator
-    ) {
-        NATIVE = _native;
-        owner = _onwer;
-        
-    }
+    event ERC20SwapExecuted(
+        uint256 amountIn,
+        uint256 swapFee,
+        uint256 amountOut
+    );
+
+    event NativeSwapExecuted(
+        uint256 amountIn,
+        uint256 swapFee,
+        uint256 amountOut
+    );
 }

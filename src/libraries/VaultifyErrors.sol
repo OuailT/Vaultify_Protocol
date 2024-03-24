@@ -9,4 +9,11 @@ library VaultifyErrors {
     //*** SmartVault.sol Erros  ***//
     error UnauthorizedCalled(address caller);
     error VaultUnderColl();
+    error LiquidatedVault(address vault);
+    error UnderCollateralisedVault(address vault);
+    error InsufficientEurosMinted(uint256 _value);
+    error NotEnoughAllowance(uint256 _value);
+    error DelegateCallFailed();
+    error InvalidTokenSymbol();
+    error SwapFeeNativeFailed();
 }

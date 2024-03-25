@@ -16,4 +16,10 @@ library VaultifyErrors {
     error DelegateCallFailed();
     error InvalidTokenSymbol();
     error SwapFeeNativeFailed();
+    error VaultNotLiquidatable();
+    error NativeTxFailed();
+    error ZeroValue();
+    error ZeroAddress();
+    error NativeRemove_Err();
+    error TokenRemove_Err();
 }

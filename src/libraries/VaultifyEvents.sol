@@ -36,4 +36,12 @@ library VaultifyEvents {
         uint256 swapFee,
         uint256 amountOut
     );
+
+    event NativeCollateralRemoved(
+        bytes32 _symbol,
+        uint256 _amount,
+        address _to
+    );
+
+    event ERC20CollateralRemoved(bytes32 _symbol, uint256 _amount, address _to);
 }

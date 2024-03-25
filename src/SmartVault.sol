@@ -63,6 +63,12 @@ contract SmartVault is ISmartVault {
         _;
     }
 
+    modifier onlyVaultManager() {
+        if (manager != msg.sender)
+            revert VaultifyErrors.UnauthorizedCalled(msg.sender);
+        _;
+    }
+
     modifier ifNotLiquidated() {
         if (liquidated) revert VaultifyErrors.LiquidatedVault(address(this));
         _;
@@ -73,6 +79,8 @@ contract SmartVault is ISmartVault {
             revert VaultifyErrors.InsufficientEurosMinted(_amount);
         _;
     }
+
+    receive() external payable {}
 
     /// @notice Retrieves the Token Manager contract.
     /// @dev Calls the manager contract to get the Token Manager's address.
@@ -88,7 +96,7 @@ contract SmartVault is ISmartVault {
         // Get accepted tokens by the manager
         ITokenManager.Token[] memory acceptedTokens = getTokenManager()
             .getAcceptedTokens();
-        for (uint256 i; acceptedTokens.length; i++) {
+        for (uint256 i; i < acceptedTokens.length; i++) {
             ITokenManager.Token memory token = acceptedTokens[i];
             euro += calculator.tokenToEuroAvg(
                 token,
@@ -157,10 +165,50 @@ contract SmartVault is ISmartVault {
     }
 
     // Will return true if the the vault is fully coll
-    function fullyCollateralised(
-        uint256 _amount
-    ) private view returns (uint256) {
+    function fullyCollateralised(uint256 _amount) private view returns (bool) {
         mintedEuros + _amount <= MaxMintableEuros();
+    }
+
+    // under collateralised function
+    function underCollateralised() public view returns (bool) {
+        mintedEuros > MaxMintableEuros();
+    }
+
+    function liquidate() external onlyVaultOwner {
+        // Check if the vault is collaterlized
+        if (!underCollateralised())
+            revert VaultifyErrors.VaultNotLiquidatable();
+
+        liquidated = true;
+        mintedEuros = 0;
+        liquidateNative();
+        ITokenManager.Token[] memory tokens = getTokenManager()
+            .getAcceptedTokens();
+        for (uint256 i = 0; i < tokens.length; i++) {
+            ITokenManager.Token memory token = tokens[i];
+            if (token.symbol != NATIVE) {
+                liquidateERC20(IERC20(token.addr));
+            }
+        }
+    }
+
+    function liquidateNative() private {
+        uint EthBal = address(this).balance;
+        // Check if the vault has enough ETH balance
+        if (EthBal != 0) {
+            (bool succ, ) = payable(smartVaultManager.liquidator()).call{
+                value: EthBal
+            }("");
+            if (!succ) revert VaultifyErrors.NativeTxFailed();
+        }
+    }
+
+    function liquidateERC20(IERC20 _token) private {
+        uint256 Erc20Bal = _token.balanceOf(address(this));
+        // Check if the contract has enough balance for the specific token
+        if (_token.balanceOf(address(this)) != 0) {
+            _token.safeTransfer(smartVaultManager.liquidator(), Erc20Bal);
+        }
     }
 
     function borrowMint(
@@ -223,6 +271,58 @@ contract SmartVault is ISmartVault {
             _token.addr == address(0) ? smartVaultManager.weth() : _token.addr;
     }
 
+    function canRemoveCollateral(
+        ITokenManager.Token memory _token,
+        uint256 _amount
+    ) private view returns (bool) {
+        if (mintedEuros == 0) return true;
+
+        // The Maximum amount of EUROS to mint based on the collateral held in the vault.
+        uint256 currentMintable = MaxMintableEuros();
+
+        // The avg in EUROS of the amount of token to remove from the vault
+        uint256 euroValueToRemove = calculator.tokenToEuroAvg(_token, _amount);
+
+        // Ensures that the minted amount of minted EURO in the vault still backed by collateral after removing some collateral.
+        return
+            currentMintable >= euroValueToRemove &&
+            mintedEuros <= currentMintable - euroValueToRemove;
+    }
+
+    function removeNativeCollateral(
+        uint256 _amount,
+        address payable _to
+    ) external onlyVaultOwner {
+        bool canRemoveNative = canRemoveCollateral(getToken(NATIVE), _amount);
+
+        if (!canRemoveNative) revert VaultifyErrors.NativeRemove_Err();
+        if (_amount < 0) revert VaultifyErrors.ZeroValue();
+        if (_to == address(0)) revert VaultifyErrors.ZeroAddress();
+
+        (bool succ, ) = _to.call{value: _amount}("");
+        if (!succ) revert VaultifyErrors.NativeTxFailed();
+
+        emit VaultifyEvents.NativeCollateralRemoved(NATIVE, _amount, _to);
+    }
+
+    function removeERC20Collateral(
+        bytes32 _symbol,
+        uint256 _amount,
+        address _to
+    ) external onlyVaultOwner {
+        ITokenManager.Token memory _token = getToken(_symbol);
+
+        bool canRemoveERC20 = canRemoveCollateral(_token, _amount);
+
+        if (!canRemoveERC20) revert VaultifyErrors.TokenRemove_Err();
+        if (_amount < 0) revert VaultifyErrors.ZeroValue();
+        if (_to == address(0)) revert VaultifyErrors.ZeroAddress();
+
+        IERC20(_token.addr).safeTransfer(_to, _amount);
+
+        emit VaultifyEvents.ERC20CollateralRemoved(_symbol, _amount, _to);
+    }
+
     function executeNativeSwapAndFee(
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
@@ -231,6 +331,7 @@ contract SmartVault is ISmartVault {
         (bool succ, ) = payable(smartVaultManager.liquidator()).call{
             value: _swapFee
         }("");
+
         if (!succ) revert VaultifyErrors.SwapFeeNativeFailed();
 
         // Execute The swap
@@ -311,5 +412,9 @@ contract SmartVault is ISmartVault {
         inToken == smartVaultManager.weth()
             ? executeNativeSwapAndFee(params, swapFee)
             : executeERC20SwapAndFee(params, swapFee);
+    }
+
+    function setOwner(address _newOwner) external onlyVaultManager {
+        owner = _newOwner;
     }
 }

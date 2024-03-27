@@ -22,4 +22,5 @@ library VaultifyErrors {
     error ZeroAddress();
     error NativeRemove_Err();
     error TokenRemove_Err();
+    error VaultNotUnderCollateralised(address vault);
 }

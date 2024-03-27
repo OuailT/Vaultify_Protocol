@@ -30,7 +30,7 @@ contract SmartVaultManager is
 {
     using SafeERC20 for IERC20;
 
-    uint256 public constant HUNDRED = 1e5;
+    uint256 public constant HUNDRED_PRC = 1e5;
 
     address public protocol;
     address public liquidator;
@@ -137,6 +137,37 @@ contract SmartVaultManager is
             );
     }
 
+    function liquidateVault(uint256 _tokenId) external onlyLiquidator {
+        // Retrieve vault with the tokenId
+        ISmartVault vault = ISmartVault(
+            smartVaultIndex.getVaultAddress(_tokenId)
+        );
+
+        try vault.undercollateralised() returns (bool _undercollateralised) {
+            if (!_undercollateralised)
+                revert VaultifyErrors.VaultNotUnderCollateralised(vault);
+
+            // liquidate vault
+            vault.liquidate();
+
+            // REVOKE ROLE
+            IEUROs(euros).revokeRole(
+                IEUROs(euros).MINTER_ROLE(),
+                address(vault)
+            );
+
+            IEUROs(euros).revokeRole(
+                IEUROs(euros).BURNER_ROLE(),
+                address(vault)
+            );
+
+            // emit VaultLiquidated()
+            emit VaultLiquidated(address(vault));
+        } catch {
+            revert("other-liquidation-error");
+        }
+    }
+
     // Liquidate vault(); todo later;
 
     // setter functions //
@@ -184,6 +215,7 @@ contract SmartVaultManager is
         liquidator = _liquidator;
     }
 
+    // // Also Added function to fix bug in LiquidationPool
     // Create a function that get invoked when a burn, mint, transfer of tokens is being made
-    // NOTE: Todo later.
+    // NOTE: Todo later
 }

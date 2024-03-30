@@ -23,4 +23,6 @@ library VaultifyErrors {
     error NativeRemove_Err();
     error TokenRemove_Err();
     error VaultNotUnderCollateralised(address vault);
+    error NotEnoughEurosAllowance();
+    error NotEnoughTstAllowance();
 }

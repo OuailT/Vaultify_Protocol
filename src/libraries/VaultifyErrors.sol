@@ -25,4 +25,5 @@ library VaultifyErrors {
     error VaultNotUnderCollateralised(address vault);
     error NotEnoughEurosAllowance();
     error NotEnoughTstAllowance();
+    error InvalidDecrementAmount();
 }

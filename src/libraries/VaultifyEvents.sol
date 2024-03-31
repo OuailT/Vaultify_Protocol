@@ -44,4 +44,11 @@ library VaultifyEvents {
     );
 
     event ERC20CollateralRemoved(bytes32 _symbol, uint256 _amount, address _to);
+
+    event PositionIncreased(
+        address staker,
+        uint256 createdAt,
+        uint256 tstValue,
+        uint256 eurosValue
+    );
 }

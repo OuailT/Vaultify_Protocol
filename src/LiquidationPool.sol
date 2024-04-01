@@ -22,15 +22,15 @@ contract LiquidationPool is ILiquidationPool {
     // struct
     struct Position {
         address holder;
-        uint256 TstTokens;
-        uint256 EurosTokens;
+        uint256 tstTokens;
+        uint256 eurosTokens;
     }
 
     struct PendingStake {
         address holder;
         uint256 createdAt;
-        uint256 TstTokens;
-        uint256 EurosTokens;
+        uint256 tstTokens;
+        uint256 eurosTokens;
     }
 
     struct Rewards {
@@ -101,8 +101,8 @@ contract LiquidationPool is ILiquidationPool {
         pendingStakes.push({
             holder: msg.sender,
             createdAt: block.timestamp,
-            TstTokens: _tstVal,
-            EurosTokens: _eurosVal
+            tstTokens: _tstVal,
+            eurosTokens: _eurosVal
         });
 
         // Add the staker/holder as unique to avoid duplicate address
@@ -113,42 +113,80 @@ contract LiquidationPool is ILiquidationPool {
 
     // decrease position function
     function decreasePosition(uint256 _tstVal, uint256 _eurosVal) external {
+        // READ from memory
+        Position memory _userPosition = positions[msg.sender];
         // Check if the user has enough tst or Euros tokens to remove from it position
+
         if (
-            positions[msg.sender].TstTokens < _tstVal &&
-            positions[msg.sender].EurosTokens < _eurosVal
+            _userPosition.tstTokens < _tstVal &&
+            _userPosition.eurosTokens < _eurosVal
         ) revert VaultifyErrors.InvalidDecrementAmount();
 
         consolidatePendingStakes();
         ILiquidationPoolManager(poolManager).distributeFees();
 
-        if (_tstVal > 0) // Decrease msg.sender position if > 0
-        {
+        if (_tstVal > 0) {
             IERC20(TST).safeTransfer(msg.sender, _tstVal);
-            positions[msg.sender].TstTokens -= _tstVal;
+            unchecked {
+                _userPosition.tstTokens -= _tstVal;
+            }
         }
 
         if (_eurosVal > 0) {
             IERC20(EUROs).safeTransfer(msg.sender, _eurosVal);
-            positions[msg.sender].EurosTokens -= _eurosVal;
+            unchecked {
+                _userPosition.eurosTokens -= _eurosVal;
+            }
         }
 
-        // TODO
-        // create function to check if the positon is Emoty
+        // create function to check if the positon is Empty
+        if (userPosition.tstTokens == 0 && userPosition.eurosTokens == 0) {
+            deletePosition(_userPosition);
+        }
+
+        emit positionDecreased(msg.sender, _tstVal, _eurosVal);
+    }
+
+    function deleteHolder(address _holder) private {
+        for (uint256 i = 0; i < holders.length; ) {
+            // the element to be deleted is found at index i
+            if (holders[i] == _holder) {
+                // replace the amount to be deleted with the last element in the array: to save gas
+                holders[i] == holders[holders.length - 1];
+                holders.pop();
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    // delete Positions and holders
+    function deletePosition(Position memory _position) private {
+        // delete holder
+        deleteHolder(_position.holder);
+        delete positions[_position.holder];
     }
 
     // deletePendingStake
     function deletePendingStake(uint256 _i) private {
-        for (uint256 i = _i; i < pendingStakes.length - 1; i++) {
+        for (uint256 i = _i; i < pendingStakes.length - 1; ) {
             pendingStakes[i] = pendingStakes[i + 1];
+            unchecked {
+                ++i;
+            }
         }
         pendingStakes.pop();
     }
 
     function addUniqueHolder(address _holder) private {
-        for (uint256 i = 0; i < holders.length; i++) {
+        for (uint256 i = 0; i < holders.length; ) {
             // Check for duplicate
             if (holders[i] == _holder) return;
+            unchecked {
+                ++i;
+            }
         }
         holders.push(_holder);
     }
@@ -165,11 +203,11 @@ contract LiquidationPool is ILiquidationPool {
 
             // To prevent front-runing attacks to take advantage of rewards
             if (_stakePending.createdAt < deadline) {
-                positions[_stakePending.holder].holder = _stakePending.holder;
-                positions[_stakePending.holder].TstTokens += _stakePending
-                    .TstTokens;
-                positions[_stakePending.holder].EurosTokens += _stakePending
-                    .EurosTokens;
+                // WRITE to STORAGE
+                Position storage position = positions[_stakePending.holder];
+                position.holder = _stakePending.holder;
+                position.tstTokens += _stakePending.tstTokens;
+                position.eurosTokens += _stakePending.eurosTokens;
 
                 // Delete Pending Stakes of the users
                 deletePendingStake(uint256(i));
@@ -178,3 +216,12 @@ contract LiquidationPool is ILiquidationPool {
         }
     }
 }
+
+/**
+
+    positions[_stakePending.holder].holder = _stakePending.holder;
+positions[_stakePending.holder].tstTokens += _stakePending.tstTokens;
+positions[_stakePending.holder].eurosTokens += _stakePending.eurosTokens;
+
+
+ */

@@ -51,4 +51,10 @@ library VaultifyEvents {
         uint256 tstValue,
         uint256 eurosValue
     );
+
+    event positionDecreased(
+        address staker,
+        uint256 tstValue,
+        uint256 eurosValue
+    );
 }

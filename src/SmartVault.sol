@@ -91,7 +91,6 @@ contract SmartVault is ISmartVault {
 
     /// @notice Calculates the total collateral value in EUROs within the vault.
     /// @dev Sums up the EURO value of all accepted tokens in the vault.
-    /// @return euros Total collateral value in EUROs.
     function euroCollateral() internal view returns (uint256 euro) {
         // Get accepted tokens by the manager
         ITokenManager.Token[] memory acceptedTokens = getTokenManager()
@@ -114,8 +113,8 @@ contract SmartVault is ISmartVault {
         // The percentage of minted token(borrowed token) that must be backed by collateral
         // to keep vault collatalized
         uint256 requiredCollateralValue = (mintedEuros *
-            ISmartVaultManager().collateralRate()) /
-            ISmartVaultManager().HUNDRED_PRC();
+            smartVaultManager.collateralRate()) /
+            smartVaultManager.HUNDRED_PRC();
 
         // The amount of collateral held in the vault in EUROs after the swap
         uint256 collateralValueMinusSwapValue = euroCollateral() -
@@ -146,6 +145,38 @@ contract SmartVault is ISmartVault {
 
         if (_token.symbol == bytes32(0))
             revert VaultifyErrors.InvalidTokenSymbol();
+    }
+
+    function status() external view returns (Status memory) {
+        return
+            Status(
+                address(this),
+                mintedEuros,
+                MaxMintableEuros(),
+                euroCollateral(),
+                getAssets(),
+                liquidated,
+                VERSION,
+                VAULT_TYPE
+            );
+    }
+
+    function getAssets() private view returns (Asset[] memory) {
+        ITokenManager.Token[] memory acceptedTokens = getTokenManager()
+            .getAcceptedTokens();
+
+        // Create Fixed sized Array based on the length of the acceptedTokens.add.
+        Asset[] memory assets = new Asset[](acceptedTokens.length);
+        for (uint256 i = 0; i < acceptedTokens.length; i++) {
+            ITokenManager.Token memory token = acceptedTokens[i];
+            uint256 assetBalance = getAssetBalance(token.symbol, token.addr);
+            assets[i] = Asset(
+                token,
+                assetBalance,
+                calculator.tokenToEuroAvg(token, assetBalance)
+            );
+        }
+        return assets;
     }
 
     function getAssetBalance(
@@ -356,8 +387,9 @@ contract SmartVault is ISmartVault {
             _swapFee
         );
 
+        // //@audit todo Check the difference between forceApprove and increaseallowance?
         // approve the router to spend amountin on the vault behalf to conduct the swap
-        IERC20(_params.tokenIn).safeApprove(
+        IERC20(_params.tokenIn).forceApprove(
             smartVaultManager.swapRouter2(),
             _params.amountIn
         );
@@ -386,7 +418,7 @@ contract SmartVault is ISmartVault {
         uint256 _amount
     ) external onlyVaultOwner {
         // Calculate the fee swap
-        uint256 swapFee = (_amount * smartVaultManager.swapFee()) /
+        uint256 swapFee = (_amount * smartVaultManager.swapFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
         address inToken = getSwapAddressFor(_inTokenSybmol);

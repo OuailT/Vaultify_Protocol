@@ -20,17 +20,17 @@ contract PriceCalculator is IPriceCalculator {
         maxAge = _maxAge;
     }
 
+    // Exchange forloops for other solutions like structs
     function tokenToEuro(
         ITokenManager.Token memory _token,
         uint256 _tokenValue
     ) external view returns (uint256) {
         // Scale the _tokenValue based on the address of the token used
-
         uint256 collateralUSD;
 
         {
             uint256 collateralScaled = _tokenValue *
-                10 ** getTokenScaleDiff(_token.symbol, _token.addr); // to create later
+                10 ** getTokenScaleDiff(_token.symbol, _token.addr);
 
             // Get the price of the TokenToEuro from oracle price Fees;
             IChainlinkAggregatorV3 tokenToEuroFeed = ChainlinkAggregatorV3(

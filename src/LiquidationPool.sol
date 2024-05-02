@@ -6,11 +6,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
 import {IEUROs} from "./interfaces/IEUROs.sol";
-import {IChainlinkAggregatorV3} from "../src/interfaces/IChainlinkAggregatorV3.sol";
+// import {IChainlinkAggregatorV3} from "./interfaces/IChainlinkAggregatorV3.sol";
 import {ILiquidationPool} from "./interfaces/ILiquidationPool.sol";
 import {ILiquidationPoolManager} from "./interfaces/ILiquidationPoolManager.sol";
 import {ITokenManager} from "./interfaces/ITokenManager.sol";
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
+import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 
 contract LiquidationPool is ILiquidationPool {
     using SafeERC20 for IERC20;
@@ -98,17 +99,24 @@ contract LiquidationPool is ILiquidationPool {
         }
 
         // Push the stake request to pendingStake
-        pendingStakes.push({
-            holder: msg.sender,
-            createdAt: block.timestamp,
-            tstTokens: _tstVal,
-            eurosTokens: _eurosVal
-        });
+        pendingStakes.push(
+            PendingStake({
+                holder: msg.sender,
+                createdAt: block.timestamp,
+                tstTokens: _tstVal,
+                eurosTokens: _eurosVal
+            })
+        );
 
         // Add the staker/holder as unique to avoid duplicate address
         addUniqueHolder(msg.sender); // TODO
 
-        emit PositionIncreased(msg.sender, block.timestamp, _tstVal, _eurosVal);
+        emit VaultifyEvents.PositionIncreased(
+            msg.sender,
+            block.timestamp,
+            _tstVal,
+            _eurosVal
+        );
     }
 
     // decrease position function
@@ -140,11 +148,11 @@ contract LiquidationPool is ILiquidationPool {
         }
 
         // create function to check if the positon is Empty
-        if (userPosition.tstTokens == 0 && userPosition.eurosTokens == 0) {
-            deletePosition(_userPosition);
+        if (_userPosition.tstTokens == 0 && _userPosition.eurosTokens == 0) {
+            deletePosition(_userPosition.holder);
         }
 
-        emit positionDecreased(msg.sender, _tstVal, _eurosVal);
+        emit VaultifyEvents.positionDecreased(msg.sender, _tstVal, _eurosVal);
     }
 
     function deleteHolder(address _holder) private {
@@ -163,10 +171,10 @@ contract LiquidationPool is ILiquidationPool {
     }
 
     // delete Positions and holders
-    function deletePosition(Position memory _position) private {
+    function deletePosition(address _holder) private {
         // delete holder
-        deleteHolder(_position.holder);
-        delete positions[_position.holder];
+        deleteHolder(_holder);
+        delete positions[_holder];
     }
 
     // deletePendingStake
@@ -191,7 +199,6 @@ contract LiquidationPool is ILiquidationPool {
         holders.push(_holder);
     }
 
-    // Deep work
     // function that allows pending stakes position to be consolidatin as position in the pool
     function consolidatePendingStakes() private {
         // Create a dealine variable to check the validity of the order
@@ -216,12 +223,3 @@ contract LiquidationPool is ILiquidationPool {
         }
     }
 }
-
-/**
-
-    positions[_stakePending.holder].holder = _stakePending.holder;
-positions[_stakePending.holder].tstTokens += _stakePending.tstTokens;
-positions[_stakePending.holder].eurosTokens += _stakePending.eurosTokens;
-
-
- */

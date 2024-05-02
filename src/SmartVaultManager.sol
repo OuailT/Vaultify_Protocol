@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {INFTMetadataGenerator} from "./interfaces/INFTMetadataGenerator.sol";
 import {IEUROs} from "./interfaces/IEUROs.sol";
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
-import {ISmartVaultManagerV2} from "./interfaces/ISmartVaultManagerV2.sol";
+// import {ISmartVaultManagerV2} from "./interfaces/ISmartVaultManagerV2.sol";
 import {ISmartVault} from "./interfaces/ISmartVault.sol";
 import {ISmartVaultDeployer} from "./interfaces/ISmartVaultDeployer.sol";
 import {ISmartVaultIndex} from "./interfaces/ISmartVaultIndex.sol";
@@ -23,7 +23,6 @@ import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 
 contract SmartVaultManager is
     ISmartVaultManager,
-    ISmartVaultManagerV2,
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable
@@ -145,7 +144,9 @@ contract SmartVaultManager is
 
         try vault.undercollateralised() returns (bool _undercollateralised) {
             if (!_undercollateralised)
-                revert VaultifyErrors.VaultNotUnderCollateralised(vault);
+                revert VaultifyErrors.VaultNotUnderCollateralised(
+                    address(vault)
+                );
 
             // liquidate vault
             vault.liquidate();
@@ -162,7 +163,7 @@ contract SmartVaultManager is
             );
 
             // emit VaultLiquidated()
-            emit VaultLiquidated(address(vault));
+            emit VaultifyEvents.VaultLiquidated(address(vault));
         } catch {
             revert("other-liquidation-error");
         }

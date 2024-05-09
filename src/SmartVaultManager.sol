@@ -22,7 +22,6 @@ import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 /// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
 
 contract SmartVaultManager is
-    ISmartVaultManager,
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable
@@ -67,8 +66,7 @@ contract SmartVaultManager is
     // params: none;
     // returns the address of the smart vault;
     function createNewVault()
-        public
-        view
+        external
         returns (uint256 tokenId, address vault)
     {
         // increment tokenId by 1

@@ -15,7 +15,7 @@ import {IWETH} from "./interfaces/IWETH.sol";
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 
-contract SmartVault is ISmartVault {
+abstract contract SmartVault is ISmartVault {
     using SafeERC20 for IERC20;
 
     uint8 private constant VERSION = 2;

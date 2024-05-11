@@ -40,6 +40,8 @@ abstract contract LiquidationPool is ILiquidationPool {
         uint8 dec;
     }
 
+    uint256 public constant MINIMUM_DEPOSIT = 0.05e18;
+
     address[] public holders;
     mapping(address => Position) private positions;
     mapping(bytes => uint256) private rewards;
@@ -48,6 +50,7 @@ abstract contract LiquidationPool is ILiquidationPool {
 
     address payable public poolManager;
     address public tokenManager;
+    mapping(address => uint256) private holdersIndex;
 
     /// @notice Initializes the Liquidation Pool.
     /// @param _TST Address of the TST token contract.
@@ -68,8 +71,13 @@ abstract contract LiquidationPool is ILiquidationPool {
     }
 
     // TODO Change tokens other tokens names
+    // TODO ADD Minimum amount to add to the pool as well as to the smartVaut to encourage liquidator
+    // to liquidate Smartvault.
     function increasePosition(uint256 _tstVal, uint256 _eurosVal) external {
-        require(_tstVal > 0 || _eurosVal > 0);
+        require(
+            _tstVal >= MINIMUM_DEPOSIT || _eurosVal >= MINIMUM_DEPOSIT,
+            "Deposit must exceed minimum requirement"
+        );
 
         // Check if the contract has allowance to transfer both tokens
         bool isTstApproved = IERC20(TST).allowance(msg.sender, address(this)) >=
@@ -131,7 +139,7 @@ abstract contract LiquidationPool is ILiquidationPool {
         ) revert VaultifyErrors.InvalidDecrementAmount();
 
         consolidatePendingStakes();
-        // NOTE ILiquidationPoolManager(poolManager).distributeFees(); 
+        // NOTE ILiquidationPoolManager(poolManager).distributeFees();
 
         if (_tstVal > 0) {
             IERC20(TST).safeTransfer(msg.sender, _tstVal);
@@ -155,21 +163,6 @@ abstract contract LiquidationPool is ILiquidationPool {
         emit VaultifyEvents.positionDecreased(msg.sender, _tstVal, _eurosVal);
     }
 
-    function deleteHolder(address _holder) private {
-        for (uint256 i = 0; i < holders.length; ) {
-            // the element to be deleted is found at index i
-            if (holders[i] == _holder) {
-                // replace the amount to be deleted with the last element in the array: to save gas
-                holders[i] == holders[holders.length - 1];
-                holders.pop();
-                break;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
     // delete Positions and holders
     function deletePosition(address _holder) private {
         // delete holder
@@ -188,19 +181,61 @@ abstract contract LiquidationPool is ILiquidationPool {
         pendingStakes.pop();
     }
 
+    // function addUniqueHolder(address _holder) private {
+    //     for (uint256 i = 0; i < holders.length; ) {
+    //         // Check for duplicate
+    //         if (holders[i] == _holder) return;
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+    //     holders.push(_holder);
+    // }
+
     function addUniqueHolder(address _holder) private {
-        for (uint256 i = 0; i < holders.length; ) {
-            // Check for duplicate
-            if (holders[i] == _holder) return;
-            unchecked {
-                ++i;
-            }
+        if (holdersIndex[_holder] == 0) {
+            holders.push[_holder];
+            // Store the index of the new holder, which is length of the array - 1
+            holdersIndex[_holder] = holders.length - 1;
+        } else {
+            return;
         }
-        holders.push(_holder);
     }
 
+    function deleteHolder(address _holder) private {
+        uint256 index = holdersIndex[_holder];
+        if (index != 0 || holders[0] == _holder) {
+            // Replace the holder that we want to delete with the last holder in the array holder
+            // @audit this will never be able to target the first holder 0
+            holders[index] = holders[holders.length - 1];
+
+            // set the index of the desired removed element to last holder in the array
+            holdersIndex[holders[holders.length - 1]] = index;
+
+            // Remove the last element
+            holders.pop();
+
+            delete holdersIndex[_holder];
+        }
+    }
+
+    // function deleteHolder(address _holder) private {
+    //     for (uint256 i = 0; i < holders.length; ) {
+    //         // the element to be deleted is found at index i
+    //         if (holders[i] == _holder) {
+    //             // replace the amount to be deleted with the last element in the array: to save gas
+    //             holders[i] == holders[holders.length - 1];
+    //             holders.pop();
+    //             break;
+    //         }
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+    // }
+
     // function that allows pending stakes position to be consolidatin as position in the pool
-    function consolidatePendingStakes() private {
+    function consolidatePendingStakes() external {
         // Create a dealine variable to check the validity of the order
         uint256 deadline = block.timestamp - 1 days;
 
@@ -208,6 +243,7 @@ abstract contract LiquidationPool is ILiquidationPool {
             // get the data at the index(i)
             PendingStake memory _stakePending = pendingStakes[uint256(i)];
 
+            // This is done to reduce MEV opportunities(wait at least 24H to increase position)
             // To prevent front-runing attacks to take advantage of rewards
             if (_stakePending.createdAt < deadline) {
                 // WRITE to STORAGE
@@ -223,77 +259,144 @@ abstract contract LiquidationPool is ILiquidationPool {
         }
     }
 
-    function getMinimumStakeAmount(Position memory _position) private pure returns(uint256) {
-        return _position.tstTokens > _position.eurosTokens ? _position.eurosTokens : _position.tstTokens;
+    function getMinimumStakeAmount(
+        Position memory _position
+    ) private pure returns (uint256) {
+        return
+            _position.tstTokens > _position.eurosTokens
+                ? _position.eurosTokens
+                : _position.tstTokens;
     }
 
-
-    function getTotalStakes() external returns(uint256 _stake) {
-        for(uint256 i =0; i < holders.length; i++) {
+    function getTotalStakes() private view returns (uint256 _stake) {
+        for (uint256 i = 0; i < holders.length; i++) {
             Position memory _position = positions[holders[i]];
             _stake += getMinimumStakeAmount(_position);
         }
     }
 
-    function distributeLiquatedAssets(ILiquidationPoolManager.Asset memory _assets,
-        uint256 _collateralRate, 
-        uint256 _hundredPRC) external payable {
-
+    function distributeLiquatedAssets(
+        ILiquidationPoolManager.Asset[] memory _assets,
+        uint256 _collateralRate,
+        uint256 _hundredPRC
+    ) external payable {
         // Consolidate pending stakes
         consolidatePendingStakes();
 
-        
         // get the price of EURO/USD from chainlink
-        (,int256 priceEurUsd,,,)= AggregatorV3Interface(eurUsd).latestRoundData();
-        if(priceEurUsd <= 0) revert VaultifyErrors.InvalidPrice();
+        (, int256 priceEurUsd, , , ) = AggregatorV3Interface(eurUsd)
+            .latestRoundData();
+        if (priceEurUsd <= 0) revert VaultifyErrors.InvalidPrice();
 
         // calculates the total staked amount in the pool using the getStakeTotal() function.
         uint256 stakeTotal = getTotalStakes();
 
-        // keep track of the total EUROs to be burned after purchased liquidated asset 
+        // keep track of the total EUROs to be burned after purchased liquidated asset
         uint256 burnEuros;
 
         // Keep track if the native tokens purchased
-        uint256 nativePuchased;
-        
+        uint256 nativePurchased;
+
         // NOTE To do later change forloop to avoid out of gas
         // iterates over each holder in the holders array and retrieves their position
-        for(uint256 j = 0; j < holders.length; j++) {
-            
+        for (uint256 j = 0; j < holders.length; j++) {
             // READ get holder position
             Position memory _position = positions[holders[j]];
 
             // get holder stake Amount
-            uint256 stakedAmount = getMinimumStakeAmount(_position);
+            uint256 _stakedAmount = getMinimumStakeAmount(_position);
 
-            if(stakedAmount > 0) {
-                // Iterate throught all the liquidated assets array and buy them automatically 
-                for(uint256 i = 0; i < _assets.length; i++) {
+            if (_stakedAmount > 0) {
+                // Iterate throught all the liquidated assets array and buy them automatically
+                for (uint256 i = 0; i < _assets.length; i++) {
                     ILiquidationPoolManager.Asset memory asset = _assets[i];
 
-                    if(asset.amount > 0) {
+                    if (asset.amount > 0) {
                         // retrieves the asset's USD price from a Chainlink oracle
-                        (, int256 assetPriceUsd, , , ) = AggregatorV3Interface(asset.token.clAddr)
-                            .latestRoundData();
+                        (, int256 assetPriceUsd, , , ) = AggregatorV3Interface(
+                            asset.token.clAddr
+                        ).latestRoundData();
 
                         // Calculate the portion/share of the holder in speicific amount of liquidated token from the vault
                         // based on the avaible amount of liquidated tokens * amountUsersStake / totalStakedAmountInPool;
                         // calculates the holder's portion of the asset based on their stake
-                        uint256 _portion = (asset.amount * _stakedAmount) / stakeTotal;
+                        uint256 _portion = (asset.amount * _stakedAmount) /
+                            stakeTotal;
 
                         // The cost in Euros that the staker will use to automatically purchase
                         // //their share of the liquidated asset.
-                        uint256 costInEuros = _portion * 10 ** (18 - asset.token.dec)
-                        * uint256(assetPriceUsd) / uint256(priceEurUsd)
-                            * _hundredPC / _collateralRate;
-                        
+                        uint256 costInEuros = (((_portion *
+                            10 ** (18 - asset.token.dec) *
+                            uint256(assetPriceUsd)) / uint256(priceEurUsd)) *
+                            _hundredPRC) / _collateralRate;
+
                         ///TODO  Ask AI how can I think like or how can I develop this mathematical mindset as DeFi developer.
                         // Ask for resources.
-                    }
-                    
-                }
 
+                        if (costInEuros > _position.eurosTokens) {
+                            // adjusts the portion to be proportional to the available EUROs
+                            _portion =
+                                (_portion * _position.eurosTokens) /
+                                costInEuros;
+
+                            costInEuros = _position.eurosTokens;
+                        }
+
+                        _position.eurosTokens -= costInEuros;
+
+                        // add the rewards to an already exisiting rewards if any
+                        rewards[
+                            abi.encodePacked(
+                                _position.holder,
+                                asset.token.symbol
+                            )
+                        ] += _portion;
+
+                        // burn Euros that the stakers paid the liquidated asset with
+                        burnEuros += costInEuros;
+
+                        // Handle tokens transfer from the manager to liquidity pool
+                        if (asset.token.addr == address(0)) {
+                            // Keep track of totalAmount of purchased ETH by the user to use it to get any leftovers.
+                            nativePurchased += _portion;
+                        } else {
+                            IERC20(asset.token.addr).safeTransferFrom(
+                                poolManager,
+                                address(this),
+                                _portion
+                            );
+                        }
+                    }
+                }
+            }
+            // WRITE
+            positions[holders[j]] = _position;
+        }
+
+        // Burn EUROS tokens to keep the value of the token and control tokens circulation/supply.
+        if (burnEuros > 0) IEUROs(EUROs).burn(address(this), burnEuros);
+
+        // return any excess ETH that was distributed to stakers
+        returnExcessETH(_assets, nativePurchased);
+    }
+
+    // function that ETH left over after stakers purchased
+    function returnExcessETH(
+        ILiquidationPoolManager.Asset[] memory _assets,
+        uint256 _nativePurchased
+    ) private {
+        // Loop throught all the the assets until _asset.token.addr == address(0)
+        // if so check of there any leftovers
+        for (uint256 i = 0; i < _assets.length; i++) {
+            address _assetAddr = _assets[i].token.addr;
+            bytes32 _assetSymbol = _assets[i].token.symbol;
+
+            if (_assetAddr == address(0) && _assetSymbol != bytes32(0)) {
+                (bool sent, ) = poolManager.call{
+                    value: _assets[i].amount - _nativePurchased
+                }("");
+                require(sent);
             }
         }
-    }    I
+    }
 }

@@ -43,13 +43,14 @@ abstract contract LiquidationPool is ILiquidationPool {
     uint256 public constant MINIMUM_DEPOSIT = 0.05e18;
 
     address[] public holders;
-    mapping(address => Position) private positions;
-    mapping(bytes => uint256) private rewards;
 
-    PendingStake[] private pendingStakes;
-
+    // PendingStake[] private pendingStakes;
     address payable public poolManager;
     address public tokenManager;
+
+    mapping(address => Position) private positions;
+    mapping(bytes => uint256) private rewards;
+    mapping(address => PendingStake) private aggregatedPendingStakes;
     mapping(address => uint256) private holdersIndex;
 
     /// @notice Initializes the Liquidation Pool.
@@ -106,15 +107,17 @@ abstract contract LiquidationPool is ILiquidationPool {
             );
         }
 
-        // Push the stake request to pendingStake
-        pendingStakes.push(
-            PendingStake({
-                holder: msg.sender,
-                createdAt: block.timestamp,
-                tstTokens: _tstVal,
-                eurosTokens: _eurosVal
-            })
-        );
+        // READ FROM THE STORAGE ONCE
+        PendingStake storage stake = aggregatedPendingStakes[msg.sender];
+
+        PendingStake memory updatePendingStake = PendingStake({
+            holder: msg.sender,
+            createdAt: block.timestamp,
+            tstTokens: stake.tstTokens + _tstVal,
+            eurosTokens: stake.eurosTokens + _eurosVal
+        });
+
+        aggregatedPendingStakes[msg.sender] = updatePendingStake;
 
         // Add the staker/holder as unique to avoid duplicate address
         addUniqueHolder(msg.sender); // TODO
@@ -131,6 +134,7 @@ abstract contract LiquidationPool is ILiquidationPool {
     function decreasePosition(uint256 _tstVal, uint256 _eurosVal) external {
         // READ from memory
         Position memory _userPosition = positions[msg.sender];
+
         // Check if the user has enough tst or Euros tokens to remove from it position
 
         if (
@@ -139,7 +143,7 @@ abstract contract LiquidationPool is ILiquidationPool {
         ) revert VaultifyErrors.InvalidDecrementAmount();
 
         consolidatePendingStakes();
-        // NOTE ILiquidationPoolManager(poolManager).distributeFees();
+        // NOTE ILiquidationPoolManager(poolManager).distributeFees(); // TODO
 
         if (_tstVal > 0) {
             IERC20(TST).safeTransfer(msg.sender, _tstVal);
@@ -170,32 +174,10 @@ abstract contract LiquidationPool is ILiquidationPool {
         delete positions[_holder];
     }
 
-    // deletePendingStake
-    function deletePendingStake(uint256 _i) private {
-        for (uint256 i = _i; i < pendingStakes.length - 1; ) {
-            pendingStakes[i] = pendingStakes[i + 1];
-            unchecked {
-                ++i;
-            }
-        }
-        pendingStakes.pop();
-    }
-
-    // function addUniqueHolder(address _holder) private {
-    //     for (uint256 i = 0; i < holders.length; ) {
-    //         // Check for duplicate
-    //         if (holders[i] == _holder) return;
-    //         unchecked {
-    //             ++i;
-    //         }
-    //     }
-    //     holders.push(_holder);
-    // }
-
     function addUniqueHolder(address _holder) private {
         if (holdersIndex[_holder] == 0) {
-            holders.push[_holder];
-            // Store the index of the new holder, which is length of the array - 1
+            holders.push(_holder);
+            // Store the index of the new holder, which is length of the array - 1(index start at 0)
             holdersIndex[_holder] = holders.length - 1;
         } else {
             return;
@@ -219,42 +201,39 @@ abstract contract LiquidationPool is ILiquidationPool {
         }
     }
 
-    // function deleteHolder(address _holder) private {
-    //     for (uint256 i = 0; i < holders.length; ) {
-    //         // the element to be deleted is found at index i
-    //         if (holders[i] == _holder) {
-    //             // replace the amount to be deleted with the last element in the array: to save gas
-    //             holders[i] == holders[holders.length - 1];
-    //             holders.pop();
-    //             break;
-    //         }
-    //         unchecked {
-    //             ++i;
-    //         }
-    //     }
-    // }
-
     // function that allows pending stakes position to be consolidatin as position in the pool
-    function consolidatePendingStakes() external {
+    function consolidatePendingStakes() private {
         // Create a dealine variable to check the validity of the order
         uint256 deadline = block.timestamp - 1 days;
 
-        for (int256 i = 0; uint256(i) < pendingStakes.length; i++) {
-            // get the data at the index(i)
-            PendingStake memory _stakePending = pendingStakes[uint256(i)];
+        for (uint256 i = 0; i < holders.length; i++) {
+            address holder = holders[i];
 
+            // State changing operation
+            PendingStake storage _pendingStake = aggregatedPendingStakes[
+                holder
+            ];
+
+            // @audit-issue Check if holder == _pending.holder to avoid storage collision.
             // This is done to reduce MEV opportunities(wait at least 24H to increase position)
             // To prevent front-runing attacks to take advantage of rewards
-            if (_stakePending.createdAt < deadline) {
-                // WRITE to STORAGE
-                Position storage position = positions[_stakePending.holder];
-                position.holder = _stakePending.holder;
-                position.tstTokens += _stakePending.tstTokens;
-                position.eurosTokens += _stakePending.eurosTokens;
+            if (_pendingStake.createdAt < deadline) {
+                // READ from STORAGE once
+                Position storage position = positions[_pendingStake.holder];
 
-                // Delete Pending Stakes of the users
-                deletePendingStake(uint256(i));
-                i--;
+                // update Changes in memory first
+                Position memory updatePosition = Position({
+                    holder: _pendingStake.holder,
+                    tstTokens: position.tstTokens + _pendingStake.tstTokens,
+                    eurosTokens: position.eurosTokens +
+                        _pendingStake.eurosTokens
+                });
+
+                // WRITE TO STORAGE ONCE
+                positions[_pendingStake.holder] = updatePosition;
+
+                // Reset the pending stake
+                delete aggregatedPendingStakes[holder];
             }
         }
     }

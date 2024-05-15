@@ -14,7 +14,8 @@ import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 
-abstract contract LiquidationPool is ILiquidationPool {
+// Add Event for important task
+contract LiquidationPool is ILiquidationPool {
     using SafeERC20 for IERC20;
 
     address private immutable TST;
@@ -150,7 +151,7 @@ abstract contract LiquidationPool is ILiquidationPool {
         ) revert VaultifyErrors.InvalidDecrementAmount();
 
         consolidatePendingStakes();
-        // NOTE ILiquidationPoolManager(poolManager).distributeFees(); // TODO
+        ILiquidationPoolManager(poolManager).distributeFees();
 
         if (_tstVal > 0) {
             IERC20(TST).safeTransfer(msg.sender, _tstVal);
@@ -423,7 +424,7 @@ abstract contract LiquidationPool is ILiquidationPool {
         return _tstTokens;
     }
 
-    function distributeFees(uint256 _amount) external onlyPoolManager {
+    function distributeRewardFees(uint256 _amount) external onlyPoolManager {
         uint256 _totalTST = getTotalTst();
 
         if (_totalTST > 0) {
@@ -444,5 +445,72 @@ abstract contract LiquidationPool is ILiquidationPool {
                     .eurosTokens += pendPositionFeeShares;
             }
         }
+    }
+
+    function getHolderRewards(
+        address _holder
+    ) private view returns (Rewards[] memory) {
+        // Get the accepted tokens by the protocol
+        VaultifyStructs.Token[] memory _tokens = ITokenManager(tokenManager)
+            .getAcceptedTokens();
+
+        // Create a fixed sized array based on the length of _tokens
+        Rewards[] memory _rewards = new Rewards[](_tokens.length);
+
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            _rewards[i] = Rewards(
+                _tokens[i].symbol,
+                rewards[abi.encodePacked(_holder, _tokens[i].symbol)],
+                _tokens[i].dec
+            );
+        }
+        return _rewards;
+    }
+
+    // Returns the amount of TST and EUROS tokens of holder pendin stakes
+    function getHolderPendingStakes(
+        address _holder
+    ) public view returns (uint256 _pendingTST, uint256 _pendingEUROS) {
+        PendingStake memory _pendingStake = aggregatedPendingStakes[_holder];
+        if (_pendingStake.holder == _holder) {
+            _pendingTST += _pendingStake.tstTokens;
+            _pendingEUROS += _pendingStake.eurosTokens;
+        }
+    }
+
+    // function that returns the position of user including their pendingStake Tokens as well as rewards
+    function position(
+        address _holder
+    )
+        external
+        view
+        returns (Position memory _position, Rewards[] memory _rewards)
+    {
+        // get the user position
+        _position = positions[_holder];
+
+        // Get the holder pending stakes
+        (uint256 _pendingTST, uint256 _pendingEUROs) = getHolderPendingStakes(
+            _holder
+        );
+
+        // Add the total amount of the user deposit in both TST/EUROS
+        // in the protocol(pending or staked)
+        _position.eurosTokens += _pendingEUROs;
+        _position.tstTokens += _pendingTST;
+
+        //if a holder's staked TST is greater than zero, they receive additional
+        // EUROs proportional to their TST stake. This mechanism is
+        // designed to encourage holders to deposit more TST governance to the pool
+        // tokens into the pool
+
+        if (_position.tstTokens > 0) {
+            uint256 rewardsEuros = (IERC20(EUROs).balanceOf(poolManager) *
+                _position.tstTokens) / getTotalTst();
+
+            _position.eurosTokens += rewardsEuros;
+        }
+
+        _rewards = getHolderRewards(_holder);
     }
 }

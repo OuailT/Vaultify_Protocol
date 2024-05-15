@@ -14,6 +14,7 @@ import {IWETH} from "./interfaces/IWETH.sol";
 
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
+import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 
 abstract contract SmartVault is ISmartVault {
     using SafeERC20 for IERC20;
@@ -59,13 +60,13 @@ abstract contract SmartVault is ISmartVault {
     /// @notice Modifier to allow only the owner of the vault to call a function.
     modifier onlyVaultOwner() {
         if (owner != msg.sender)
-            revert VaultifyErrors.UnauthorizedCalled(msg.sender);
+            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
         _;
     }
 
     modifier onlyVaultManager() {
         if (manager != msg.sender)
-            revert VaultifyErrors.UnauthorizedCalled(msg.sender);
+            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
         _;
     }
 
@@ -93,10 +94,10 @@ abstract contract SmartVault is ISmartVault {
     /// @dev Sums up the EURO value of all accepted tokens in the vault.
     function euroCollateral() internal view returns (uint256 euro) {
         // Get accepted tokens by the manager
-        ITokenManager.Token[] memory acceptedTokens = getTokenManager()
+        VaultifyStructs.Token[] memory acceptedTokens = getTokenManager()
             .getAcceptedTokens();
         for (uint256 i; i < acceptedTokens.length; i++) {
-            ITokenManager.Token memory token = acceptedTokens[i];
+            VaultifyStructs.Token memory token = acceptedTokens[i];
             euro += calculator.tokenToEuroAvg(
                 token,
                 getAssetBalance(token.symbol, token.addr)
@@ -135,8 +136,8 @@ abstract contract SmartVault is ISmartVault {
     // Get token address by it token
     function getToken(
         bytes32 _symbol
-    ) private view returns (ITokenManager.Token memory _token) {
-        ITokenManager.Token[] memory tokens = getTokenManager()
+    ) private view returns (VaultifyStructs.Token memory _token) {
+        VaultifyStructs.Token[] memory tokens = getTokenManager()
             .getAcceptedTokens();
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -147,9 +148,9 @@ abstract contract SmartVault is ISmartVault {
             revert VaultifyErrors.InvalidTokenSymbol();
     }
 
-    function status() external view returns (Status memory) {
+    function status() external view returns (VaultifyStructs.Status memory) {
         return
-            Status(
+            VaultifyStructs.Status(
                 address(this),
                 mintedEuros,
                 MaxMintableEuros(),
@@ -161,16 +162,23 @@ abstract contract SmartVault is ISmartVault {
             );
     }
 
-    function getAssets() private view returns (Asset[] memory) {
-        ITokenManager.Token[] memory acceptedTokens = getTokenManager()
+    function getAssets()
+        private
+        view
+        returns (VaultifyStructs.SmartVaultAssets[] memory)
+    {
+        VaultifyStructs.Token[] memory acceptedTokens = getTokenManager()
             .getAcceptedTokens();
 
         // Create Fixed sized Array based on the length of the acceptedTokens.add.
-        Asset[] memory assets = new Asset[](acceptedTokens.length);
+        VaultifyStructs.SmartVaultAssets[]
+            memory assets = new VaultifyStructs.SmartVaultAssets[](
+                acceptedTokens.length
+            );
         for (uint256 i = 0; i < acceptedTokens.length; i++) {
-            ITokenManager.Token memory token = acceptedTokens[i];
+            VaultifyStructs.Token memory token = acceptedTokens[i];
             uint256 assetBalance = getAssetBalance(token.symbol, token.addr);
-            assets[i] = Asset(
+            assets[i] = VaultifyStructs.SmartVaultAssets(
                 token,
                 assetBalance,
                 calculator.tokenToEuroAvg(token, assetBalance)
@@ -182,7 +190,7 @@ abstract contract SmartVault is ISmartVault {
     function getAssetBalance(
         bytes32 _sybmol,
         address addr
-    ) internal view returns (uint256) {
+    ) internal view returns (uint256 amount) {
         _sybmol == NATIVE
             ? address(this).balance
             : IERC20(addr).balanceOf(address(this));
@@ -213,10 +221,10 @@ abstract contract SmartVault is ISmartVault {
         liquidated = true;
         mintedEuros = 0;
         liquidateNative();
-        ITokenManager.Token[] memory tokens = getTokenManager()
+        VaultifyStructs.Token[] memory tokens = getTokenManager()
             .getAcceptedTokens();
         for (uint256 i = 0; i < tokens.length; i++) {
-            ITokenManager.Token memory token = tokens[i];
+            VaultifyStructs.Token memory token = tokens[i];
             if (token.symbol != NATIVE) {
                 liquidateERC20(IERC20(token.addr));
             }
@@ -297,13 +305,13 @@ abstract contract SmartVault is ISmartVault {
     }
 
     function getSwapAddressFor(bytes32 _symbol) private view returns (address) {
-        ITokenManager.Token memory _token = getToken(_symbol);
+        VaultifyStructs.Token memory _token = getToken(_symbol);
         return
             _token.addr == address(0) ? smartVaultManager.weth() : _token.addr;
     }
 
     function canRemoveCollateral(
-        ITokenManager.Token memory _token,
+        VaultifyStructs.Token memory _token,
         uint256 _amount
     ) private view returns (bool) {
         if (mintedEuros == 0) return true;
@@ -341,7 +349,7 @@ abstract contract SmartVault is ISmartVault {
         uint256 _amount,
         address _to
     ) external onlyVaultOwner {
-        ITokenManager.Token memory _token = getToken(_symbol);
+        VaultifyStructs.Token memory _token = getToken(_symbol);
 
         bool canRemoveERC20 = canRemoveCollateral(_token, _amount);
 

@@ -12,6 +12,7 @@ import {ILiquidationPoolManager} from "./interfaces/ILiquidationPoolManager.sol"
 import {ITokenManager} from "./interfaces/ITokenManager.sol";
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
+import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 
 abstract contract LiquidationPool is ILiquidationPool {
     using SafeERC20 for IERC20;
@@ -69,6 +70,12 @@ abstract contract LiquidationPool is ILiquidationPool {
         eurUsd = _eurUsd;
         tokenManager = _tokenManager;
         poolManager = payable(msg.sender);
+    }
+
+    modifier onlyPoolManager() {
+        if (msg.sender != poolManager)
+            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
+        _;
     }
 
     // TODO Change tokens other tokens names
@@ -255,7 +262,7 @@ abstract contract LiquidationPool is ILiquidationPool {
     }
 
     function distributeLiquatedAssets(
-        ILiquidationPoolManager.Asset[] memory _assets,
+        VaultifyStructs.Asset[] memory _assets,
         uint256 _collateralRate,
         uint256 _hundredPRC
     ) external payable {
@@ -288,7 +295,7 @@ abstract contract LiquidationPool is ILiquidationPool {
             if (_stakedAmount > 0) {
                 // Iterate throught all the liquidated assets array and buy them automatically
                 for (uint256 i = 0; i < _assets.length; i++) {
-                    ILiquidationPoolManager.Asset memory asset = _assets[i];
+                    VaultifyStructs.Asset memory asset = _assets[i];
 
                     if (asset.amount > 0) {
                         // retrieves the asset's USD price from a Chainlink oracle
@@ -361,7 +368,7 @@ abstract contract LiquidationPool is ILiquidationPool {
 
     // function that ETH left over after stakers purchased
     function returnExcessETH(
-        ILiquidationPoolManager.Asset[] memory _assets,
+        VaultifyStructs.Asset[] memory _assets,
         uint256 _nativePurchased
     ) private {
         // Loop throught all the the assets until _asset.token.addr == address(0)
@@ -375,6 +382,66 @@ abstract contract LiquidationPool is ILiquidationPool {
                     value: _assets[i].amount - _nativePurchased
                 }("");
                 require(sent);
+            }
+        }
+    }
+
+    function claimRewards() external {
+        // Get the accepted Tokens by the admin
+        VaultifyStructs.Token[] memory _tokens = ITokenManager(tokenManager)
+            .getAcceptedTokens();
+
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            VaultifyStructs.Token memory _token = _tokens[i];
+            uint256 _rewardsAmount = rewards[
+                abi.encodePacked(msg.sender, _token.symbol)
+            ];
+
+            if (_rewardsAmount > 0) {
+                // First we delete the rewards before making external calls(Reentracy attacks)
+                delete rewards[abi.encodePacked(msg.sender, _token.symbol)];
+
+                if (_token.addr == address(0)) {
+                    (bool sent, ) = payable(msg.sender).call{
+                        value: _rewardsAmount
+                    }("");
+                    if (!sent) revert VaultifyErrors.NativeTxFailed();
+                } else {
+                    IERC20(_token.addr).transfer(msg.sender, _rewardsAmount);
+                }
+            }
+        }
+    }
+
+    function getTotalTst() public view returns (uint256 _tstTokens) {
+        for (uint256 i = 0; i < holders.length; i++) {
+            address _holder = holders[i];
+            _tstTokens +=
+                positions[_holder].tstTokens +
+                aggregatedPendingStakes[_holder].tstTokens;
+        }
+        return _tstTokens;
+    }
+
+    function distributeFees(uint256 _amount) external onlyPoolManager {
+        uint256 _totalTST = getTotalTst();
+
+        if (_totalTST > 0) {
+            for (uint256 i = 0; i < holders.length; i++) {
+                address _holder = holders[i];
+
+                // distribute fees among already consolidated position
+                uint256 positionsFeeShares = (_amount *
+                    positions[_holder].tstTokens) / _totalTST;
+
+                positions[_holder].eurosTokens += positionsFeeShares;
+
+                // distribute Fees among pending position
+                uint256 pendPositionFeeShares = (_amount *
+                    aggregatedPendingStakes[_holder].tstTokens) / _totalTST;
+
+                aggregatedPendingStakes[_holder]
+                    .eurosTokens += pendPositionFeeShares;
             }
         }
     }

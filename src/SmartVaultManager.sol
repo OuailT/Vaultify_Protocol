@@ -15,6 +15,7 @@ import {ISmartVaultDeployer} from "./interfaces/ISmartVaultDeployer.sol";
 import {ISmartVaultIndex} from "./interfaces/ISmartVaultIndex.sol";
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
+import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 
 /// @title SmartVaultManager
 /// OUAIL Allows the vault manager to set important  state variables, generate NFT metadata of the vault, deploy a new smart vault.
@@ -45,15 +46,6 @@ contract SmartVaultManager is
     address public weth;
     address public swapRouter;
     address public swapRouter2;
-
-    // create a struct to store the vault data
-    struct SmartVaultData {
-        uint256 tokenId;
-        uint256 collateralRate;
-        uint256 mintFeeRate;
-        uint256 burnFeeRate;
-        ISmartVault.Status status;
-    }
 
     modifier onlyLiquidator() {
         require(msg.sender == liquidator, "err-invalid-liquidator");
@@ -95,19 +87,26 @@ contract SmartVaultManager is
         emit VaultifyEvents.VaultDeployed(vault, msg.sender, euros, tokenId);
     }
 
-    // returns SmartVaultData struct type array
-    function getVaults() external view returns (SmartVaultData[] memory) {
+    // returns VaultifyStructs.SmartVaultData struct type array
+    function getVaults()
+        external
+        view
+        returns (VaultifyStructs.SmartVaultData[] memory)
+    {
         // Get vaults who belong to the user by ids from smartcontractIndex;
         uint256[] memory tokenIds = smartVaultIndex.getTokenIds(msg.sender);
 
         uint256 tokenIdsLengh = tokenIds.length;
 
         // create fixed sized array to store data of each smart vault based on their IDs
-        SmartVaultData[] memory vaultData = new SmartVaultData[](tokenIdsLengh);
+        VaultifyStructs.SmartVaultData[]
+            memory vaultData = new VaultifyStructs.SmartVaultData[](
+                tokenIdsLengh
+            );
 
         for (uint256 i = 0; i < tokenIdsLengh; i++) {
             uint256 tokenId = tokenIds[i];
-            vaultData[i] = SmartVaultData({
+            vaultData[i] = VaultifyStructs.SmartVaultData({
                 tokenId: tokenId,
                 collateralRate: collateralRate,
                 mintFeeRate: mintFeeRate,
@@ -123,7 +122,7 @@ contract SmartVaultManager is
     function tokenURI(
         uint256 _tokenId
     ) public view virtual override returns (string memory) {
-        ISmartVault.Status memory vaultStatus = ISmartVault(
+        VaultifyStructs.Status memory vaultStatus = ISmartVault(
             smartVaultIndex.getVaultAddress(_tokenId)
         ).status();
         return

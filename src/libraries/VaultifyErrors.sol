@@ -7,7 +7,7 @@ library VaultifyErrors {
     error InvalidPrice();
 
     //*** SmartVault.sol Erros  ***//
-    error UnauthorizedCalled(address caller);
+    error UnauthorizedCaller(address caller);
     error VaultUnderColl();
     error LiquidatedVault(address vault);
     error UnderCollateralisedVault(address vault);

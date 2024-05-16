@@ -16,7 +16,7 @@ import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 
-abstract contract SmartVault is ISmartVault {
+contract SmartVault is ISmartVault {
     using SafeERC20 for IERC20;
 
     uint8 private constant VERSION = 2;

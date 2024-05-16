@@ -7,21 +7,24 @@ library VaultifyStructs {
         bytes32 symbol;
         address addr;
         uint8 dec;
-        address clAddr;
+        address clAddr; // oracle address
         uint8 clDec;
     }
 
+    // Liquidated assets held by the liquation Pool Manager when run liquidation.
     struct Asset {
         Token token;
         uint256 amount;
     }
 
+    // Assets held as collateral in the smart vault
     struct SmartVaultAssets {
         VaultifyStructs.Token token;
         uint256 amount;
         uint256 collateralValue;
     }
 
+    // The Status of the smart vault
     struct Status {
         address vaultAddress;
         uint256 minted;
@@ -33,7 +36,7 @@ library VaultifyStructs {
         bytes32 vaultType;
     }
 
-    // create a struct to store the vault data
+    // to store the vault data
     struct SmartVaultData {
         uint256 tokenId;
         uint256 collateralRate;

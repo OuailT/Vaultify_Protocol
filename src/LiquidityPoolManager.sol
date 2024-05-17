@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {LiquidationPool} from "./LiquidationPool.sol";
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
 import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
-
+import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 contract LiquidationPoolManager is Ownable {
     using SafeERC20 for IERC20;
 
@@ -83,9 +83,12 @@ contract LiquidationPoolManager is Ownable {
             vaultManager.tokenManager()
         ).getAcceptedTokens();
 
-        VaultifyStructs.Asset[] memory _assets = new Asset[](_tokens.length);
+        VaultifyStructs.Asset[] memory _assets = new VaultifyStructs.Asset[](
+            _tokens.length
+        );
 
         uint256 liquidatorEthBal;
+
         //Allocate all the assets received by the liquitor(address(this)) and distribute them to stakers
         for (uint256 i = 0; i < _tokens.length; i++) {
             // check if token.addr is address(0)
@@ -107,5 +110,40 @@ contract LiquidationPoolManager is Ownable {
                 }
             }
         }
+
+        LiquidationPool(pool).distributeLiquatedAssets{value: liquidatorEthBal}(
+            _assets,
+            vaultManager.collateralRate(),
+            vaultManager.HUNDRED_PRC()
+        );
+
+        // Fowards any token that the contract holds to the protocol address
+        forwardsRemainingRewards(_tokens);
+    }
+
+    function forwardsRemainingRewards(
+        VaultifyStructs.Token[] memory _tokens
+    ) private {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            VaultifyStructs.Token memory token = _tokens[i];
+            if (token.addr == address(0)) {
+                uint256 ethBal = address(this).balance;
+                if (ethBal > 0) {
+                    (bool succeed, ) = protocol.call{value: ethBal}("");
+                    if (!succeed) revert VaultifyErrors.NativeTxFailed();
+                }
+            } else {
+                uint256 ercBal = IERC20(token.addr).balanceOf(address(this));
+                if (ercBal > 0) {
+                    IERC20(token.addr).transfer(protocol, ercBal);
+                }
+            }
+        }
+    }
+
+    function setPoolFeePercentage(
+        uint32 _poolFeePercentrage
+    ) external onlyOwner {
+        poolFeePercentage = _poolFeePercentrage;
     }
 }

@@ -139,7 +139,7 @@ contract SmartVaultManager is
             smartVaultIndex.getVaultAddress(_tokenId)
         );
 
-        try vault.undercollateralised() returns (bool _undercollateralised) {
+        try vault.underCollateralised() returns (bool _undercollateralised) {
             if (!_undercollateralised)
                 revert VaultifyErrors.VaultNotUnderCollateralised(
                     address(vault)
@@ -215,5 +215,13 @@ contract SmartVaultManager is
 
     // // Also Added function to fix bug in LiquidationPool
     // Create a function that get invoked when a burn, mint, transfer of tokens is being made
-    // NOTE: Todo later
+    function grantPoolBurnApproval(address poolAddr) external OnlyOwner {
+        // Grant burner role to LiquidityPool for EURO
+        IEUROs(euros).grantRole(IEUROs(euros).BURNER_ROLE(), poolAddr);
+    }
+
+    function revokePoolBurnApproval(address poolAddr) external OnlyOwner {
+        // Grant burner role to LiquidityPool for EURO
+        IEUROs(euros).revokeRole(IEUROs(euros).BURNER_ROLE(), poolAddr);
+    }
 }

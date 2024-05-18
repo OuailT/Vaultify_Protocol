@@ -190,7 +190,7 @@ contract SmartVault is ISmartVault {
     function getAssetBalance(
         bytes32 _sybmol,
         address addr
-    ) internal view returns (uint256 amount) {
+    ) internal view returns (uint256) {
         _sybmol == NATIVE
             ? address(this).balance
             : IERC20(addr).balanceOf(address(this));
@@ -213,7 +213,7 @@ contract SmartVault is ISmartVault {
         mintedEuros > MaxMintableEuros();
     }
 
-    function liquidate() external onlyVaultOwner {
+    function liquidate() external onlyVaultManager {
         // Check if the vault is collaterlized
         if (!underCollateralised())
             revert VaultifyErrors.VaultNotLiquidatable();
@@ -268,12 +268,16 @@ contract SmartVault is ISmartVault {
         emit VaultifyEvents.EUROsMinted(_to, _amount - fee, fee);
     }
 
-    function burnEuros(uint256 _amount) external ifEurosMinted(_amount) {
+    function burnEuros(
+        uint256 _amount
+    ) external ifEurosMinted(_amount) onlyVaultOwner {
         // Check if this contract has enough allowance of euro tokens to burn;
         bool euroApproved = IERC20(EUROs).allowance(
             msg.sender,
             address(this)
         ) >= _amount;
+        // we already give the the contract the allowance amount which deduct the fee from?
+        // Why do we give the contract an approval again throught delegate call to spend the fee as the fee is already part of the amount
 
         if (!euroApproved) revert VaultifyErrors.NotEnoughAllowance(_amount);
 
@@ -281,17 +285,18 @@ contract SmartVault is ISmartVault {
             smartVaultManager.HUNDRED_PRC();
 
         mintedEuros -= _amount;
+
         EUROs.burn(msg.sender, _amount - fee);
 
         // Execute approve function in the context of the caller msg.sender to approve this contract
         // to spend/transfer the fees to the liquidator
-        (bool succ, ) = address(EUROs).delegatecall(
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
-                address(this),
-                fee
-            )
-        );
+        // (bool succ, ) = address(EUROs).delegatecall(
+        //     abi.encodeWithSignature(
+        //         "approve(address,uint256)",
+        //         address(this),
+        //         fee
+        //     )
+        // );
 
         if (!succ) revert VaultifyErrors.DelegateCallFailed();
 

@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {LiquidationPool} from "./LiquidationPool.sol";
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
+import {ITokenManager} from "./interfaces/ITokenManager.sol";
+
 import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 contract LiquidationPoolManager is Ownable {
@@ -33,7 +35,7 @@ contract LiquidationPoolManager is Ownable {
         address _eurUsd,
         address payable _protocol,
         uint32 _poolFeePercentage
-    ) {
+    ) Ownable(msg.sender) {
         pool = address(
             new LiquidationPool(
                 _TST,
@@ -96,7 +98,10 @@ contract LiquidationPoolManager is Ownable {
             if (_token.addr == address(0)) {
                 liquidatorEthBal = address(this).balance;
                 if (liquidatorEthBal > 0) {
-                    _assets[i] = VaultifyStructs.Asset(_token, liquidorEthBal);
+                    _assets[i] = VaultifyStructs.Asset(
+                        _token,
+                        liquidatorEthBal
+                    );
                 }
             } else {
                 IERC20 ierc20Token = IERC20(_token.addr);

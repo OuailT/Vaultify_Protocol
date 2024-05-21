@@ -298,7 +298,7 @@ contract SmartVault is ISmartVault {
         //     )
         // );
 
-        if (!succ) revert VaultifyErrors.DelegateCallFailed();
+        // if (!succ) revert VaultifyErrors.DelegateCallFailed();
 
         IERC20(address(EUROs)).safeTransferFrom(
             msg.sender,

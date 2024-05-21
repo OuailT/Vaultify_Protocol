@@ -57,4 +57,6 @@ library VaultifyEvents {
         uint256 tstValue,
         uint256 eurosValue
     );
+
+    event VaultTransferred(uint256 _tokenId, uint256 _from, uint256 _to);
 }

@@ -1,1 +1,0 @@
-[] Check if the project compiling without any error.

@@ -9,12 +9,14 @@ interface ITokenManager {
         returns (VaultifyStructs.Token[] memory);
 
     function getToken(
-        bytes32
-    ) external view returns (VaultifyStructs.Token memory);
+        bytes32 _symbol
+    ) external view returns (VaultifyStructs.Token memory token);
 
     function getTokenIfExists(
-        address
-    ) external view returns (VaultifyStructs.Token memory);
+        address _tokenAddr
+    ) external view returns (VaultifyStructs.Token memory token);
 
-    function addAcceptedToken(address, address) external;
+    function addAcceptedToken(address _token, address _chainlinkFeed) external;
+
+    function removeAcceptedToken(bytes32 _symbol) external;
 }

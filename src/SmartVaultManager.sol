@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {INFTMetadataGenerator} from "./interfaces/INFTMetadataGenerator.sol";
 import {IEUROs} from "./interfaces/IEUROs.sol";
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
-// import {ISmartVaultManagerV2} from "./interfaces/ISmartVaultManagerV2.sol";
 import {ISmartVault} from "./interfaces/ISmartVault.sol";
 import {ISmartVaultDeployer} from "./interfaces/ISmartVaultDeployer.sol";
 import {ISmartVaultIndex} from "./interfaces/ISmartVaultIndex.sol";
@@ -84,9 +83,6 @@ contract SmartVaultManager is
         ISmartVaultIndex smartVaultIndex = ISmartVaultIndex(_smartVaultIndex);
     }
 
-    // Exercice: Create a function that allow user to mint smart vault
-    // params: none;
-    // returns the address of the smart vault;
     function createNewVault()
         external
         returns (uint256 tokenId, address vault)
@@ -255,6 +251,7 @@ contract SmartVaultManager is
         IEUROs(euros).revokeRole(IEUROs(euros).BURNER_ROLE(), poolAddr);
     }
 
+    // Triggerd when a NFT is minted or transffered
     function _update(
         address _to,
         uint256 _tokenId,

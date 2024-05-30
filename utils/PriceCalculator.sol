@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.17;
+pragma solidity 0.8.22;
 
-import {IChainlinkAggregatorV3} from "../src/interfaces/IChainlinkAggregatorV3.sol";
-import {ERC20} from "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {AggregatorV3Interface} from "../src/interfaces/IChainlinkAggregatorV3.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IPriceCalculator} from "../src/interfaces/IPriceCalculator.sol";
-import {VaultifyErrors} from "../librairies/VaultidyErrors.sol";
+import {VaultifyErrors} from "../src/libraries/VaultifyErrors.sol";
+import {VaultifyStructs} from "../src/libraries/VaultifyStructs.sol";
 
 contract PriceCalculator is IPriceCalculator {
     bytes32 private immutable NATIVE;
@@ -12,17 +13,16 @@ contract PriceCalculator is IPriceCalculator {
     // price Oracle Stale Threshold;
     uint256 public maxAge;
 
-    IChainlinkAggregatorV3 public euroUsdFeed;
+    AggregatorV3Interface public euroUsdFeed;
 
-    constructor(bytes _native, address _euroUsdFeed, _maxAge) {
+    constructor(bytes32 _native, address _euroUsdFeed) {
         NATIVE = _native;
-        euroUsdFeed = IChainlinkAggregatorV3(_euroUsdFeed);
-        maxAge = _maxAge;
+        euroUsdFeed = AggregatorV3Interface(_euroUsdFeed);
     }
 
     // Exchange forloops for other solutions like structs
     function tokenToEuro(
-        ITokenManager.Token memory _token,
+        VaultifyStructs.Token memory _token,
         uint256 _tokenValue
     ) external view returns (uint256) {
         // Scale the _tokenValue based on the address of the token used
@@ -33,8 +33,8 @@ contract PriceCalculator is IPriceCalculator {
                 10 ** getTokenScaleDiff(_token.symbol, _token.addr);
 
             // Get the price of the TokenToEuro from oracle price Fees;
-            IChainlinkAggregatorV3 tokenToEuroFeed = ChainlinkAggregatorV3(
-                _token.OracleAddr
+            AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
+                _token.clAddr
             );
 
             // Retieves the price of token in USD
@@ -49,7 +49,7 @@ contract PriceCalculator is IPriceCalculator {
             if (tokenUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
 
             if (block.timestamp - tokenUpdatedAt < maxAge) {
-                revert Vaultify.PriceStale();
+                revert VaultifyErrors.PriceStale();
             }
 
             // Calculates the collateral value in USD
@@ -63,7 +63,7 @@ contract PriceCalculator is IPriceCalculator {
         if (euroUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
 
         if (block.timestamp - euroUpdatedAt < maxAge) {
-            revert Vaultify.PriceStale();
+            revert VaultifyErrors.PriceStale();
         }
 
         // Divide the price of the token/collateral by the EUROUSD value to which will give us the price of token in EURO
@@ -71,7 +71,7 @@ contract PriceCalculator is IPriceCalculator {
     }
 
     function tokenToEuroAvg(
-        ITokenManager.Token memory _token,
+        VaultifyStructs.Token memory _token,
         uint256 _tokenValue
     ) external view returns (uint256) {
         uint256 collateralUSD;
@@ -81,8 +81,8 @@ contract PriceCalculator is IPriceCalculator {
                 10 ** getTokenScaleDiff(_token.symbol, _token.addr);
 
             // Get the price of the TokenToEuro from oracle price Fees;
-            IChainlinkAggregatorV3 tokenToEuroFeed = ChainlinkAggregatorV3(
-                _token.OracleAddr
+            AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
+                _token.clAddr
             );
 
             // Calculates the collateral value in USD
@@ -96,7 +96,7 @@ contract PriceCalculator is IPriceCalculator {
         if (euroUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
 
         if (block.timestamp - euroUpdatedAt < maxAge) {
-            revert Vaultify.PriceStale();
+            revert VaultifyErrors.PriceStale();
         }
 
         return collateralUSD / uint256(euroUsdPrice);
@@ -105,17 +105,17 @@ contract PriceCalculator is IPriceCalculator {
     function getTokenScaleDiff(
         bytes32 symbol,
         address tokenAddress
-    ) private returns (scaleDiff) {
+    ) private returns (uint256 scaleDiff) {
         return symbol == NATIVE ? 0 : 18 - ERC20(tokenAddress).decimals();
     }
 
     function euroToToken(
-        ITokenManager.Token memory _token,
+        VaultifyStructs.Token memory _token,
         uint256 _euroValue
     ) external view returns (uint256) {
         // Get the price of the TokenToEuro from oracle price Fees;
-        IChainlinkAggregatorV3 tokenToEuroFeed = IChainlinkAggregatorV3(
-            _token.OracleAddr
+        AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
+            _token.clAddr
         );
 
         // Retieves the price of token in USD
@@ -126,7 +126,7 @@ contract PriceCalculator is IPriceCalculator {
         if (tokenUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
 
         if (block.timestamp - tokenUpdatedAt < maxAge) {
-            revert Vaultify.PriceStale();
+            revert VaultifyErrors.PriceStale();
         }
 
         (, int256 euroUsdPrice, uint256 euroUpdatedAt, , ) = euroUsdFeed
@@ -136,7 +136,7 @@ contract PriceCalculator is IPriceCalculator {
         if (euroUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
 
         if (block.timestamp - euroUpdatedAt < maxAge) {
-            revert Vaultify.PriceStale();
+            revert VaultifyErrors.PriceStale();
         }
 
         return
@@ -145,7 +145,7 @@ contract PriceCalculator is IPriceCalculator {
     }
 
     function getPriceAvg(
-        IChainlinkAggregatorV3 _tokenFeed,
+        AggregatorV3Interface _tokenFeed,
         uint8 _period
     ) private view returns (uint256) {
         uint80 roundId;
@@ -155,13 +155,13 @@ contract PriceCalculator is IPriceCalculator {
         // 1- get the last round data token to calculate it price averag
         (roundId, answer, , lastPeriod, ) = _tokenFeed.latestRoundData();
 
-        if (answer <= 0) revert Vaultify.InvalidPrice();
+        if (answer <= 0) revert VaultifyErrors.InvalidPrice();
 
         // 2- Get the start period from were I should start calculate the historical data
         uint256 startPeriod = block.timestamp - _period * 1 hours;
 
         // 3- create Two variables to keep track of the accumalation of the price as well as the rounds
-        uint256 accumlatedPrice = uint256(answer);
+        uint256 accumlatedRoundPrices = uint256(answer);
         uint256 roundCount = 1;
 
         while (lastPeriod > startPeriod && roundId > 1) {
@@ -169,7 +169,7 @@ contract PriceCalculator is IPriceCalculator {
             try _tokenFeed.getRoundData(roundId) {
                 // Get the roundData of the _tokenFeed based on the provided roundId
                 (, answer, , lastPeriod, ) = _tokenFeed.getRoundData(roundId);
-                accumlatedPrice += uint256(answer);
+                accumlatedRoundPrices += uint256(answer);
                 roundCount++;
             } catch {
                 continue;

@@ -105,7 +105,13 @@ contract SmartVault is ISmartVault {
         }
     }
 
-    // Mininmum amount out that user can get out of the swap
+    /**
+     * @notice Calculates the minimum amount out required to keep the vault collateralized after a swap.
+     * @param _inTokenSymbol The symbol of the input token.
+     * @param _outTokenSymbol The symbol of the output token.
+     * @param _amount The amount of the input token.
+     * @return The minimum amount of the output token required.
+     */
     function calculateMinimimAmountOut(
         bytes32 _inTokenSymbol,
         bytes32 _outTokenSymbol,
@@ -133,7 +139,11 @@ contract SmartVault is ISmartVault {
                 );
     }
 
-    // Get token address by it token
+    /**
+     * @notice Retrieves the token address by its symbol.
+     * @param _symbol The symbol of the token.
+     * @return _token The token details.
+     */
     function getToken(
         bytes32 _symbol
     ) private view returns (VaultifyStructs.Token memory _token) {
@@ -148,6 +158,10 @@ contract SmartVault is ISmartVault {
             revert VaultifyErrors.InvalidTokenSymbol();
     }
 
+    /**
+     * @notice Provides the current status of the vault.
+     * @return The status details of the vault.
+     */
     function status() external view returns (VaultifyStructs.Status memory) {
         return
             VaultifyStructs.Status(
@@ -162,6 +176,10 @@ contract SmartVault is ISmartVault {
             );
     }
 
+    /**
+     * @notice Retrieves the assets held in the vault.
+     * @return An array of the assets in the vault.
+     */
     function getAssets()
         private
         view
@@ -187,32 +205,51 @@ contract SmartVault is ISmartVault {
         return assets;
     }
 
+    /**
+     * @notice Gets the balance of a specific asset in the vault.
+     * @param _symbol The symbol of the asset.
+     * @param addr The address of the asset.
+     * @return The balance of the asset.
+     */
     function getAssetBalance(
-        bytes32 _sybmol,
+        bytes32 _symbol,
         address addr
     ) internal view returns (uint256) {
-        _sybmol == NATIVE
+        _symbol == NATIVE
             ? address(this).balance
             : IERC20(addr).balanceOf(address(this));
     }
 
-    // Max EUROS token to mint based on the deposited collateral provided In the vault
+    /**
+     * @notice Calculates the maximum amount of EUROs that can be minted based on the collateral.
+     * @return The maximum mintable EUROs.
+     */
     function MaxMintableEuros() internal view returns (uint256) {
         return
             (euroCollateral() * smartVaultManager.HUNDRED_PRC()) /
             smartVaultManager.collateralRate();
     }
 
-    // Will return true if the the vault is fully coll
+    /**
+     * @notice Checks if the vault will remain fully collateralized after minting a certain amount.
+     * @param _amount The amount to mint.
+     * @return True if the vault remains fully collateralized, otherwise false.
+     */
     function fullyCollateralised(uint256 _amount) private view returns (bool) {
         mintedEuros + _amount <= MaxMintableEuros();
     }
 
-    // under collateralised function
+    /**
+     * @notice Checks if the vault is under-collateralized.
+     * @return True if the vault is under-collateralized, otherwise false.
+     */
     function underCollateralised() public view returns (bool) {
         mintedEuros > MaxMintableEuros();
     }
 
+    /**
+     * @notice Liquidates the vault if it is under-collateralized.
+     */
     function liquidate() external onlyVaultManager {
         // Check if the vault is collaterlized
         if (!underCollateralised())
@@ -231,6 +268,9 @@ contract SmartVault is ISmartVault {
         }
     }
 
+    /**
+     * @notice Liquidates the native currency held in the vault.
+     */
     function liquidateNative() private {
         uint EthBal = address(this).balance;
         // Check if the vault has enough ETH balance
@@ -242,6 +282,10 @@ contract SmartVault is ISmartVault {
         }
     }
 
+    /**
+     * @notice Liquidates the ERC20 tokens held in the vault.
+     * @param _token The ERC20 token to liquidate.
+     */
     function liquidateERC20(IERC20 _token) private {
         uint256 Erc20Bal = _token.balanceOf(address(this));
         // Check if the contract has enough balance for the specific token
@@ -250,9 +294,14 @@ contract SmartVault is ISmartVault {
         }
     }
 
+    /**
+     * @notice Mints new EURO tokens to a specified address.
+     * @param _to The address to mint the tokens to.
+     * @param _amount The amount of tokens to mint.
+     */
     function borrowMint(
-        uint256 _amount,
-        address _to
+        address _to,
+        uint256 _amount
     ) external ifNotLiquidated onlyVaultOwner {
         // Get the borrow/mint Euro Fee
         uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
@@ -268,6 +317,10 @@ contract SmartVault is ISmartVault {
         emit VaultifyEvents.EUROsMinted(_to, _amount - fee, fee);
     }
 
+    /**
+     * @notice Burns EURO tokens from the caller's account.
+     * @param _amount The amount of EURO tokens to burn.
+     */
     function burnEuros(
         uint256 _amount
     ) external ifEurosMinted(_amount) onlyVaultOwner {
@@ -309,12 +362,23 @@ contract SmartVault is ISmartVault {
         emit VaultifyEvents.EUROsBurned(_amount, fee);
     }
 
+    /**
+     * @notice Retrieves the swap address for a given token symbol.
+     * @param _symbol The symbol of the token.
+     * @return The address of the token or the WETH address if the token address is zero.
+     */
     function getSwapAddressFor(bytes32 _symbol) private view returns (address) {
         VaultifyStructs.Token memory _token = getToken(_symbol);
         return
             _token.addr == address(0) ? smartVaultManager.weth() : _token.addr;
     }
 
+    /**
+     * @notice Determines if a certain amount of collateral can be removed without under-collateralizing the vault.
+     * @param _token The token information.
+     * @param _amount The amount of collateral to remove.
+     * @return True if the collateral can be removed, otherwise false.
+     */
     function canRemoveCollateral(
         VaultifyStructs.Token memory _token,
         uint256 _amount
@@ -333,6 +397,11 @@ contract SmartVault is ISmartVault {
             mintedEuros <= currentMintable - euroValueToRemove;
     }
 
+    /**
+     * @notice Removes a specified amount of native currency collateral from the vault.
+     * @param _amount The amount of native currency to remove.
+     * @param _to The address to send the removed collateral to.
+     */
     function removeNativeCollateral(
         uint256 _amount,
         address payable _to
@@ -349,6 +418,12 @@ contract SmartVault is ISmartVault {
         emit VaultifyEvents.NativeCollateralRemoved(NATIVE, _amount, _to);
     }
 
+    /**
+     * @notice Removes a specified amount of ERC20 token collateral from the vault.
+     * @param _symbol The symbol of the token.
+     * @param _amount The amount of token to remove.
+     * @param _to The address to send the removed collateral to.
+     */
     function removeERC20Collateral(
         bytes32 _symbol,
         uint256 _amount,
@@ -367,6 +442,12 @@ contract SmartVault is ISmartVault {
         emit VaultifyEvents.ERC20CollateralRemoved(_symbol, _amount, _to);
     }
 
+    /**
+     * @notice Executes a swap of native currency and deducts the swap fee.
+     * @param _params The parameters for the swap.
+     * @param _swapFee The fee for the swap.
+     * @return amountOut The amount received from the swap.
+     */
     function executeNativeSwapAndFee(
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
@@ -390,6 +471,12 @@ contract SmartVault is ISmartVault {
         );
     }
 
+    /**
+     * @notice Executes a swap of ERC20 tokens and deducts the swap fee.
+     * @param _params The parameters for the swap.
+     * @param _swapFee The fee for the swap.
+     * @return amountOut The amount received from the swap.
+     */
     function executeERC20SwapAndFee(
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
@@ -425,8 +512,14 @@ contract SmartVault is ISmartVault {
         );
     }
 
+    /**
+     * @notice Swaps a specified amount of one token for another.
+     * @param _inTokenSymbol The symbol of the input token.
+     * @param _outTokenSymbol The symbol of the output token.
+     * @param _amount The amount of the input token to swap.
+     */
     function swap(
-        bytes32 _inTokenSybmol,
+        bytes32 _inTokenSymbol,
         bytes32 _outTokenSymbol,
         uint256 _amount
     ) external onlyVaultOwner {
@@ -434,10 +527,10 @@ contract SmartVault is ISmartVault {
         uint256 swapFee = (_amount * smartVaultManager.swapFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        address inToken = getSwapAddressFor(_inTokenSybmol);
+        address inToken = getSwapAddressFor(_inTokenSymbol);
 
         uint256 minimumAmountOut = calculateMinimimAmountOut(
-            _inTokenSybmol,
+            _inTokenSymbol,
             _outTokenSymbol,
             _amount
         );
@@ -459,6 +552,10 @@ contract SmartVault is ISmartVault {
             : executeERC20SwapAndFee(params, swapFee);
     }
 
+    /**
+     * @notice Sets a new owner for the vault.
+     * @param _newOwner The address of the new owner.
+     */
     function setOwner(address _newOwner) external onlyVaultManager {
         owner = _newOwner;
     }

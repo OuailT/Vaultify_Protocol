@@ -15,4 +15,15 @@ interface ISmartVaultManager {
     function weth() external view returns (address);
     function swapRouter() external view returns (address);
     function swapFeeRate() external view returns (uint256);
+    function initialize(
+        uint256,
+        uint256,
+        address,
+        address,
+        address,
+        address,
+        address,
+        address,
+        address
+    ) external;
 }

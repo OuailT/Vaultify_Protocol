@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.17;
+pragma solidity 0.8.22;
 
-import "../contracts/SmartVaultV3.sol";
+import "src/SmartVault.sol";
 import "utils/PriceCalculator.sol";
-import "../contracts/interfaces/ISmartVaultDeployer.sol";
+import "src/interfaces/ISmartVaultDeployer.sol";
 
 contract SmartVaultDeployer is ISmartVaultDeployer {
     bytes32 private immutable NATIVE;
@@ -21,7 +21,7 @@ contract SmartVaultDeployer is ISmartVaultDeployer {
     ) external returns (address) {
         return
             address(
-                new SmartVaultV3(
+                new SmartVault(
                     NATIVE,
                     _manager,
                     _owner,

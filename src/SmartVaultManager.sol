@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
+import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {INFTMetadataGenerator} from "./interfaces/INFTMetadataGenerator.sol";
-import {IEUROs} from "./interfaces/IEUROs.sol";
-import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
-import {ISmartVault} from "./interfaces/ISmartVault.sol";
-import {ISmartVaultDeployer} from "./interfaces/ISmartVaultDeployer.sol";
-import {ISmartVaultIndex} from "./interfaces/ISmartVaultIndex.sol";
-import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
-import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
-import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
+import {INFTMetadataGenerator} from "src/interfaces/INFTMetadataGenerator.sol";
+import {IEUROs} from "src/interfaces/IEUROs.sol";
+import {ISmartVaultManager} from "src/interfaces/ISmartVaultManager.sol";
+import {ISmartVault} from "src/interfaces/ISmartVault.sol";
+import {ISmartVaultDeployer} from "src/interfaces/ISmartVaultDeployer.sol";
+import {ISmartVaultIndex} from "src/interfaces/ISmartVaultIndex.sol";
+import {VaultifyErrors} from "src/libraries/VaultifyErrors.sol";
+import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
+import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 
 /// @title SmartVaultManager
 /// OUAIL Allows the vault manager to set important  state variables, generate NFT metadata of the vault, deploy a new smart vault.

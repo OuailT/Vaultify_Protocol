@@ -14,6 +14,8 @@ contract SmartVaultIndex is ISmartVaultIndex, Ownable {
         _;
     }
 
+    constructor() Ownable(msg.sender) {}
+
     function getTokenIds(
         address _user
     ) external view returns (uint256[] memory) {

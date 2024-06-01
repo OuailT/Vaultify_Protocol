@@ -14,5 +14,5 @@ interface ISmartVaultIndex {
         address _to,
         uint256 _tokenId
     ) external;
-    function setVaultManager(address) external;
+    function setVaultManager(address _manager) external;
 }

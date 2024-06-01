@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {Test} from "../lib/forge-std/src/Test.sol";
+// import {Test} from "../lib/forge-std/src/Test.sol";
+import {Test} from "forge-std/Test.sol";
+
+// remappings = [
+//     '@openzeppelin/=lib/openzeppelin-contracts/',
+//     '@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/',
+//     'forge-std/=lib/forge-std/src/',
+//     'ds-test/=lib/forge-std/lib/ds-test/src/'
+// ]
 
 ////// Import Interfaces //////
-import {ISmartVaultManager} from "../src/interfaces/ISmartVaultManager.sol";
+import {ISmartVaultManagerMock} from "../src/mocks/ISmartVaultManagerMock.sol";
 import {ILiquidationPoolManager} from "../src/interfaces/ILiquidationPoolManager.sol";
 import {ILiquidationPool} from "../src/interfaces/ILiquidationPool.sol";
 import {ISmartVault} from "../src/interfaces/ISmartVault.sol";
@@ -25,6 +33,7 @@ import {ChainlinkMock} from "../src/mocks/ChainlinkMock.sol";
 
 // Import contracts In the scope //
 import {SmartVaultManager} from "../src/SmartVaultManager.sol";
+import {SmartVaultManagerMock} from "../src/mocks/SmartVaultManagerMock.sol";
 import {LiquidationPoolManager} from "../src/LiquidationPoolManager.sol";
 import {LiquidationPool} from "../src/LiquidationPool.sol";
 
@@ -35,7 +44,7 @@ import {VaultifyStructs} from "./../src/libraries/VaultifyStructs.sol";
 
 contract Helper is Test {
     // SETUP//
-    ISmartVaultManager public smartVaultManagerContract;
+    ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
     ILiquidationPool public liquidationPoolContract;
 
@@ -43,7 +52,7 @@ contract Helper is Test {
     ISmartVaultIndex public smartVaultIndexContract;
 
     // To store contracts address on deployement
-    address public smartVaultManager;
+    address public smartVaultManager; // Euros Admin as well
     address public liquidationPoolManager;
     address public pool;
 
@@ -80,8 +89,9 @@ contract Helper is Test {
     address public chainlinkPaxgUsd;
 
     uint256 public collateralRate = 110000; // 110%
-    uint256 public feeRate = 2000; // 2%;
-    uint256 public poolFeePercentage = 50000; // 50%;
+    uint256 public mintFeeRate = 2000; // 2%;
+    uint256 public burnFeeRate = 3000; // 3%
+    uint32 public poolFeePercentage = 50000; // 50%;
 
     bytes32 public native;
 
@@ -138,10 +148,10 @@ contract Helper is Test {
         smartVaultIndexContract = ISmartVaultIndex(smartVaultIndex);
 
         // deploy SmartVaultManager
-        smartVaultManager = address(new SmartVaultManager());
+        smartVaultManager = address(new SmartVaultManagerMock());
         vm.stopPrank();
 
-        vm.startPrank(SmartVaultManager);
+        vm.startPrank(smartVaultManager);
         euros = address(new EUROsMock());
         EUROs = IEUROs(euros);
         vm.stopPrank();
@@ -150,18 +160,19 @@ contract Helper is Test {
 
         liquidator = address(0); // set liquidator address later
 
-        smartVaultManagerContract = ISmartVaultManager(smartVaultManager);
+        smartVaultManagerContract = ISmartVaultManagerMock(smartVaultManager);
 
         // Initlize smartVaultManager
         smartVaultManagerContract.initialize(
-            collateralRate,
-            feeRate,
-            euros,
+            mintFeeRate,
+            burnFeeRate,
+            smartVaultDeployer,
             protocol,
             liquidator,
             tokenManager,
-            smartVaultDeployer,
-            smartVaultIndex
+            smartVaultIndex,
+            euros,
+            tokenManager
         );
 
         // Deploy liquidationPoolManager

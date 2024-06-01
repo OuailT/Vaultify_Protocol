@@ -5,10 +5,6 @@ libs = ['lib']
 test = 'test'
 cache_path = 'cache_forge'
 optimizer = true
-viaIR = true
 solc_version = "0.8.22"
 
-remappings = [
-    '@openzeppelin/=lib/openzeppelin-contracts/',
-    '@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/'
-]
+

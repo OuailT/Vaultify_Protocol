@@ -2,20 +2,19 @@
 pragma solidity ^0.8.22;
 
 import {VaultifyStructs} from "../libraries/VaultifyStructs.sol";
+import {AggregatorV3Interface} from "./IChainlinkAggregatorV3.sol";
 
 interface IPriceCalculator {
+    function tokenToEuro(
+        VaultifyStructs.Token memory _token,
+        uint256 _tokenValue
+    ) external view returns (uint256);
     function tokenToEuroAvg(
         VaultifyStructs.Token memory _token,
-        uint256 _amount
+        uint256 _tokenValue
     ) external view returns (uint256);
-
-    function tokenToEur(
-        VaultifyStructs.Token memory _token,
-        uint256 _amount
-    ) external view returns (uint256);
-
     function euroToToken(
         VaultifyStructs.Token memory _token,
-        uint256 _amount
+        uint256 _euroValue
     ) external view returns (uint256);
 }

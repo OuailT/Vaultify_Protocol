@@ -22,6 +22,7 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 /// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
 
 contract SmartVaultManager is
+    ISmartVaultManager,
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable
@@ -36,7 +37,7 @@ contract SmartVaultManager is
     uint256 public collateralRate;
     address public tokenManager;
     address public smartVaultDeployer;
-    ISmartVaultIndex private smartVaultIndex;
+    ISmartVaultIndex private smartVaultIndexContract;
     uint256 private lastTokenId;
     address public nftMetadataGenerator;
     uint256 public mintFeeRate;
@@ -68,7 +69,8 @@ contract SmartVaultManager is
         address _nftMetadataGenerator,
         address _smartVaultDeployer,
         address _protocol,
-        address _liquidator
+        address _liquidator,
+        address _euros
     ) external initializer {
         __Ownable_init(msg.sender);
         setMintFeeRate(_mintFeeRate);
@@ -79,8 +81,9 @@ contract SmartVaultManager is
         setNFTMetadataGenerator(_nftMetadataGenerator);
         setSmartVaultDeployer(_smartVaultDeployer);
         setProtocolAddress(_protocol);
-        setLiquidatorAddress(_liquidator);
-        ISmartVaultIndex smartVaultIndex = ISmartVaultIndex(_smartVaultIndex);
+        setLiquidator(_liquidator);
+        smartVaultIndexContract = ISmartVaultIndex(_smartVaultIndex);
+        euros = _euros;
     }
 
     function createNewVault()
@@ -104,7 +107,7 @@ contract SmartVaultManager is
         );
 
         // Add the vault to the smart vault index
-        smartVaultIndex.addVaultAddress(lastTokenId, payable(vault));
+        smartVaultIndexContract.addVaultAddress(lastTokenId, payable(vault));
 
         // Grante the vault Burn and MINT role
         IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), vault);
@@ -120,7 +123,9 @@ contract SmartVaultManager is
         returns (VaultifyStructs.SmartVaultData[] memory)
     {
         // Get vaults who belong to the user by ids from smartcontractIndex;
-        uint256[] memory tokenIds = smartVaultIndex.getTokenIds(msg.sender);
+        uint256[] memory tokenIds = smartVaultIndexContract.getTokenIds(
+            msg.sender
+        );
 
         uint256 tokenIdsLengh = tokenIds.length;
 
@@ -137,8 +142,9 @@ contract SmartVaultManager is
                 collateralRate: collateralRate,
                 mintFeeRate: mintFeeRate,
                 burnFeeRate: burnFeeRate,
-                status: ISmartVault(smartVaultIndex.getVaultAddress(tokenId))
-                    .status()
+                status: ISmartVault(
+                    smartVaultIndexContract.getVaultAddress(tokenId)
+                ).status()
             });
         }
 
@@ -149,7 +155,7 @@ contract SmartVaultManager is
         uint256 _tokenId
     ) public view virtual override returns (string memory) {
         VaultifyStructs.Status memory vaultStatus = ISmartVault(
-            smartVaultIndex.getVaultAddress(_tokenId)
+            smartVaultIndexContract.getVaultAddress(_tokenId)
         ).status();
         return
             // Generate metadata based on the vault status and tokenId
@@ -162,7 +168,7 @@ contract SmartVaultManager is
     function liquidateVault(uint256 _tokenId) external onlyLiquidator {
         // Retrieve vault with the tokenId
         ISmartVault vault = ISmartVault(
-            smartVaultIndex.getVaultAddress(_tokenId)
+            smartVaultIndexContract.getVaultAddress(_tokenId)
         );
 
         try vault.underCollateralised() returns (bool _undercollateralised) {
@@ -235,7 +241,7 @@ contract SmartVaultManager is
         protocol = _protocol;
     }
 
-    function setLiquidatorAddress(address _liquidator) public onlyOwner {
+    function setLiquidator(address _liquidator) public onlyOwner {
         liquidator = _liquidator;
     }
 
@@ -259,9 +265,11 @@ contract SmartVaultManager is
     ) internal override returns (address) {
         super._update(_to, _tokenId, _auth);
         address _from = _ownerOf(_tokenId);
-        smartVaultIndex.transferTokenId(_from, _to, _tokenId);
+        smartVaultIndexContract.transferTokenId(_from, _to, _tokenId);
         if (address(_from) != address(0)) {
-            address vaultAddress = smartVaultIndex.getVaultAddress(_tokenId);
+            address vaultAddress = smartVaultIndexContract.getVaultAddress(
+                _tokenId
+            );
             ISmartVault(vaultAddress).setOwner(_to);
         }
         emit VaultifyEvents.VaultTransferred(_tokenId, _from, _to);

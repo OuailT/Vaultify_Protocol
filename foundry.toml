@@ -2,9 +2,7 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
-test = 'test'
-cache_path = 'cache_forge'
-optimizer = true
 solc_version = "0.8.22"
+rust_log = "error"
 
 

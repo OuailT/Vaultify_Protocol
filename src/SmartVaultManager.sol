@@ -22,7 +22,6 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 /// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
 
 contract SmartVaultManager is
-    ISmartVaultManager,
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable

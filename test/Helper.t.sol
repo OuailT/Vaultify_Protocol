@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+// pragma solidity ^0.8.22;
 
-// import {Test} from "../lib/forge-std/src/Test.sol";
-import {Test} from "forge-std/Test.sol";
-
-// remappings = [
-//     '@openzeppelin/=lib/openzeppelin-contracts/',
-//     '@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/',
-//     'forge-std/=lib/forge-std/src/',
-//     'ds-test/=lib/forge-std/lib/ds-test/src/'
-// ]
+import "forge-std/Test.sol";
 
 ////// Import Interfaces //////
 import {ISmartVaultManagerMock} from "../src/mocks/ISmartVaultManagerMock.sol";
@@ -42,7 +34,7 @@ import {VaultifyStructs} from "./../src/libraries/VaultifyStructs.sol";
 
 // @audit-issue ASK chatGPT what cases I should test/cover
 
-contract Helper is Test {
+contract HelperTest is Test {
     // SETUP//
     ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
@@ -164,15 +156,14 @@ contract Helper is Test {
 
         // Initlize smartVaultManager
         smartVaultManagerContract.initialize(
+            smartVaultIndex,
             mintFeeRate,
             burnFeeRate,
-            smartVaultDeployer,
             protocol,
             liquidator,
-            tokenManager,
-            smartVaultIndex,
             euros,
-            tokenManager
+            tokenManager,
+            smartVaultDeployer
         );
 
         // Deploy liquidationPoolManager

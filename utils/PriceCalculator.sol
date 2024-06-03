@@ -105,7 +105,7 @@ contract PriceCalculator is IPriceCalculator {
     function getTokenScaleDiff(
         bytes32 symbol,
         address tokenAddress
-    ) private returns (uint256 scaleDiff) {
+    ) private view returns (uint256 scaleDiff) {
         return symbol == NATIVE ? 0 : 18 - ERC20(tokenAddress).decimals();
     }
 

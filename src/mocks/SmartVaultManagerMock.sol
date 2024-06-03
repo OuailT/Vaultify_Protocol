@@ -102,7 +102,7 @@ contract SmartVaultManagerMock is
         );
 
         // Add the vault to the smart vault index
-        smartVaultDeployer.addVaultAddress(lastTokenId, payable(vault));
+        smartVaultIndexContract.addVaultAddress(lastTokenId, payable(vault));
 
         // Grante the vault Burn and MINT role
         IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), vault);

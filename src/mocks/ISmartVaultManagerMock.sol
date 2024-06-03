@@ -21,15 +21,13 @@ interface ISmartVaultManagerMock {
         address,
         uint256,
         uint256,
-        uint256,
-        address,
-        address,
         address,
         address,
         address,
         address,
         address
     ) external;
+
     function setMintFeeRate(uint256 _mintFeeRate) external;
     function setBurnFeeRate(uint256 _burnFeeRate) external;
     function setSwapFeeRate(uint256 _swapFeerate) external;

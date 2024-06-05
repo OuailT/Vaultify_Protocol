@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.22;
 
-import "src/SmartVault.sol";
-import "utils/PriceCalculator.sol";
-import "src/interfaces/ISmartVaultDeployer.sol";
+import "../src/SmartVault.sol";
+import "./PriceCalculator.sol";
+import "../src/interfaces/ISmartVaultDeployer.sol";
 
 contract SmartVaultDeployer is ISmartVaultDeployer {
     bytes32 private immutable NATIVE;

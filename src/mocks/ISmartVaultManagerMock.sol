@@ -5,6 +5,7 @@ import {VaultifyStructs} from "../libraries/VaultifyStructs.sol";
 
 interface ISmartVaultManagerMock {
     function HUNDRED_PRC() external view returns (uint256);
+    function lastTokenId() external view returns (uint256);
     function tokenManager() external view returns (address);
     function liquidator() external view returns (address);
     function protocol() external view returns (address);
@@ -39,7 +40,7 @@ interface ISmartVaultManagerMock {
     function setProtocolAddress(address _protocol) external;
     function grantPoolBurnApproval(address poolAddr) external;
     function revokePoolBurnApproval(address poolAddr) external;
-    function createNewVault() external returns (uint256 tokenId, address vault);
+    function mintNewVault() external returns (uint256 tokenId, address vault);
     function getVaults()
         external
         view

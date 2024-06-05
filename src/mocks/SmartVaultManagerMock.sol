@@ -37,7 +37,7 @@ contract SmartVaultManagerMock is
     address public tokenManager;
     address public smartVaultDeployer;
     ISmartVaultIndex private smartVaultIndexContract;
-    uint256 private lastTokenId;
+    uint256 public lastTokenId;
     address public nftMetadataGenerator;
     uint256 public mintFeeRate;
     uint256 public burnFeeRate;
@@ -83,14 +83,15 @@ contract SmartVaultManagerMock is
         collateralRate = _collateralRate;
     }
 
-    function createNewVault()
-        external
-        returns (uint256 tokenId, address vault)
-    {
+    function name() public view override returns (string memory) {
+        super.name();
+    }
+
+    function mintNewVault() external returns (uint256 tokenId, address vault) {
         // increment tokenId by 1
         tokenId = lastTokenId + 1;
 
-        // Mint the smart vault to the caller
+        // // Mint the smart vault to the caller
         _safeMint(msg.sender, tokenId);
 
         // set the tokenId to the last token Id
@@ -103,7 +104,7 @@ contract SmartVaultManagerMock is
             euros
         );
 
-        // Add the vault to the smart vault index
+        // // Add the vault to the smart vault index
         smartVaultIndexContract.addVaultAddress(tokenId, payable(vault));
 
         // Grante the vault Burn and MINT role
@@ -260,8 +261,8 @@ contract SmartVaultManagerMock is
         uint256 _tokenId,
         address _auth
     ) internal override returns (address) {
-        super._update(_to, _tokenId, _auth);
-        address _from = _ownerOf(_tokenId);
+        // update return the prevouis owner
+        address _from = super._update(_to, _tokenId, _auth);
         smartVaultIndexContract.transferTokenId(_from, _to, _tokenId);
         if (address(_from) != address(0)) {
             address vaultAddress = smartVaultIndexContract.getVaultAddress(
@@ -270,5 +271,23 @@ contract SmartVaultManagerMock is
             ISmartVault(vaultAddress).setOwner(_to);
         }
         emit VaultifyEvents.VaultTransferred(_tokenId, _from, _to);
+
+        return _from;
     }
+
+    // // TODO test transfer
+    // function _afterTokenTransfer(
+    //     //
+    //     address _from,
+    //     address _to,
+    //     uint256 _tokenId,
+    //     uint256
+    // ) internal override {
+    //     smartVaultIndex.transferTokenId(_from, _to, _tokenId);
+    //     if (address(_from) != address(0))
+    //         ISmartVault(smartVaultIndex.getVaultAddress(_tokenId)).setOwner(
+    //             _to
+    //         );
+    //     emit VaultTransferred(_tokenId, _from, _to);
+    // }
 }

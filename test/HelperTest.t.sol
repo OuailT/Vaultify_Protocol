@@ -22,7 +22,7 @@ import {EUROsMock} from "../src/mocks/EUROsMock.sol";
 import {TokenManagerMock} from "../src/mocks/TokenManagerMock.sol";
 import {SmartVaultDeployer} from "./../utils/SmartVaultDeployer.sol";
 import {SmartVaultIndex} from "./../utils/SmartVaultIndex.sol";
-import {ChainlinkMock} from "../src/mocks/ChainlinkMock.sol";
+import {ChainlinkMockForTest} from "../src/mocks/ChainlinkMock.sol";
 
 // Import contracts In the scope //
 import {SmartVaultManager} from "../src/SmartVaultManager.sol";
@@ -90,7 +90,7 @@ contract HelperTest is Test {
 
     function setUp() public virtual {
         // Create Actor //
-        owner = vm.addr(0x1);
+        owner = vm.addr(1);
         treasury = payable(vm.addr(0x2));
 
         vm.label(owner, "Owner");
@@ -113,10 +113,10 @@ contract HelperTest is Test {
         PAXG = IERC20Mock(paxg);
 
         // Deploy Price Oracle contracts for assets;
-        chainlinkNativeUsd = address(new ChainlinkMock("ETH / USD"));
-        chainlinkEurUsd = address(new ChainlinkMock("EUR / USD"));
-        chainlinkwBtcUsd = address(new ChainlinkMock("WBTC / USD"));
-        chainlinkPaxgUsd = address(new ChainlinkMock("PAXG / USD"));
+        chainlinkNativeUsd = address(new ChainlinkMockForTest("ETH / USD"));
+        chainlinkEurUsd = address(new ChainlinkMockForTest("EUR / USD"));
+        chainlinkwBtcUsd = address(new ChainlinkMockForTest("WBTC / USD"));
+        chainlinkPaxgUsd = address(new ChainlinkMockForTest("PAXG / USD"));
 
         // Asign contracts to their interface
         priceFeedNativeUsd = AggregatorV3InterfaceMock(chainlinkNativeUsd);
@@ -195,19 +195,28 @@ contract HelperTest is Test {
         smartVaultManagerContract.setLiquidatorAddress(liquidator);
         smartVaultIndexContract.setVaultManager(smartVaultManager);
 
-        // Add accepted collateral
-        tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
-        tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
-
         vm.stopPrank();
     }
 
-    function setInitialPrice() internal {
-        // set assets Initial prices
-        priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
-        priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
-        priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
-        priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
+    // function setInitialPrice() private {
+    //     // set assets Initial prices
+    //     priceFeedNativeUsd.setPrice(20); // $2200
+    //     // priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
+    //     // priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
+    //     // priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
+    // }
+    // Slow Down
+    function setAcceptedCollateral() private {
+        vm.startPrank(owner);
+        // Add accepted collateral
+        tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
+        tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
+        vm.stopPrank();
+    }
+
+    function setUpHelper() internal {
+        setAcceptedCollateral();
+        // setInitialPrice();
     }
 
     ////////// Function Utilities /////////////
@@ -229,8 +238,8 @@ contract HelperTest is Test {
     function createVaultOwners(
         uint256 _numOfOwners
     ) public returns (ISmartVault[] memory) {
+        // address owner;
         address _vaultOwner;
-        // address _vaultAddr;
         ISmartVault vault;
 
         // Create a fixed sized array
@@ -244,17 +253,17 @@ contract HelperTest is Test {
 
             // 1- Mint a vault
             (uint256 tokenId, address vaultAddr) = smartVaultManagerContract
-                .createNewVault();
+                .mintNewVault();
 
-            vault = ISmartVault(vaultAddr);
+            // vault = ISmartVault(vaultAddr);
 
             // 2- Transfer collateral (Native, WBTC, and PAXG) to the vault
             // Transfer 10 ETH @ $2200, 1 BTC @ $42000, 10 PAXG @ $2000
             // Total initial collateral value: $84,000 or EUR76,107
-            (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
-            require(sent, "Native ETH trx failed");
-            WBTC.transfer(vaultAddr, 1 * 1e18);
-            PAXG.transfer(vaultAddr, 10 * 1e18);
+            // (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
+            // require(sent, "Native ETH trx failed");
+            // WBTC.transfer(vaultAddr, 1 * 1e18);
+            // PAXG.transfer(vaultAddr, 10 * 1e18);
 
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188

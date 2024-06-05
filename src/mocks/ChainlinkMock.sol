@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 // import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {AggregatorV3Interface} from "./../interfaces/IChainlinkAggregatorV3.sol";
 
-contract ChainlinkMock is AggregatorV3Interface {
+contract ChainlinkMockForTest is AggregatorV3Interface {
     string private desc;
 
     PriceRound[] private prices;

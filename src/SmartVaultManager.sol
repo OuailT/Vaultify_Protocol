@@ -262,8 +262,7 @@ contract SmartVaultManager is
         uint256 _tokenId,
         address _auth
     ) internal override returns (address) {
-        super._update(_to, _tokenId, _auth);
-        address _from = _ownerOf(_tokenId);
+        address _from = super._update(_to, _tokenId, _auth);
         smartVaultIndexContract.transferTokenId(_from, _to, _tokenId);
         if (address(_from) != address(0)) {
             address vaultAddress = smartVaultIndexContract.getVaultAddress(
@@ -272,5 +271,7 @@ contract SmartVaultManager is
             ISmartVault(vaultAddress).setOwner(_to);
         }
         emit VaultifyEvents.VaultTransferred(_tokenId, _from, _to);
+
+        return _from;
     }
 }

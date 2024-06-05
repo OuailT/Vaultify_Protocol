@@ -16,9 +16,10 @@ interface ISmartVaultManagerMock {
     function weth() external view returns (address);
     function swapRouter() external view returns (address);
     function swapFeeRate() external view returns (uint256);
-    function setLiquidator(address _liquidator) external;
+    function setLiquidatorAddress(address _liquidator) external;
     function initialize(
         address,
+        uint256,
         uint256,
         uint256,
         address,
@@ -36,7 +37,6 @@ interface ISmartVaultManagerMock {
     function setNFTMetadataGenerator(address _nftMetadataGenerator) external;
     function setSmartVaultDeployer(address _smartVaultDeployer) external;
     function setProtocolAddress(address _protocol) external;
-    function setLiquidatorAddress(address _liquidator) external;
     function grantPoolBurnApproval(address poolAddr) external;
     function revokePoolBurnApproval(address poolAddr) external;
     function createNewVault() external returns (uint256 tokenId, address vault);

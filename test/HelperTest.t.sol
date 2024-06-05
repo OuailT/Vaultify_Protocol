@@ -2,6 +2,7 @@
 // pragma solidity ^0.8.22;
 
 import "forge-std/Test.sol";
+import "forge-std/console.sol";
 
 ////// Import Interfaces //////
 import {ISmartVaultManagerMock} from "../src/mocks/ISmartVaultManagerMock.sol";
@@ -150,7 +151,7 @@ contract HelperTest is Test {
 
         vm.startPrank(owner);
 
-        liquidator = address(0); // set liquidator address later
+        liquidator = address(0x5); // set liquidator address later
 
         smartVaultManagerContract = ISmartVaultManagerMock(smartVaultManager);
 
@@ -159,6 +160,7 @@ contract HelperTest is Test {
             smartVaultIndex,
             mintFeeRate,
             burnFeeRate,
+            collateralRate,
             protocol,
             liquidator,
             euros,
@@ -190,20 +192,22 @@ contract HelperTest is Test {
         liquidator = liquidationPoolManager;
 
         // Set actors
-        smartVaultManagerContract.setLiquidator(liquidator);
+        smartVaultManagerContract.setLiquidatorAddress(liquidator);
         smartVaultIndexContract.setVaultManager(smartVaultManager);
 
         // Add accepted collateral
         tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
         tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
 
+        vm.stopPrank();
+    }
+
+    function setInitialPrice() internal {
         // set assets Initial prices
         priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
         priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
-        priceFeedEurUsd.setPrice(42_000 * 1e8); // $42000
-        priceFeedEurUsd.setPrice(2000 * 1e8); // $2000
-
-        vm.stopPrank();
+        priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
+        priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
     }
 
     ////////// Function Utilities /////////////
@@ -239,7 +243,8 @@ contract HelperTest is Test {
             vm.startPrank(_vaultOwner);
 
             // 1- Mint a vault
-            (, address vaultAddr) = smartVaultManagerContract.createNewVault();
+            (uint256 tokenId, address vaultAddr) = smartVaultManagerContract
+                .createNewVault();
 
             vault = ISmartVault(vaultAddr);
 

@@ -54,14 +54,15 @@ contract SmartVaultManagerMock is
     /// @dev To prevent the implementation contract from being used, we invoke the _disableInitializers
     /// function in the constructor to automatically lock it when it is deployed.
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     function initialize(
         address _smartVaultIndex,
         uint256 _mintFeeRate,
         uint256 _burnFeeRate,
+        uint256 _collateralRate,
         address _protocol,
         address _liquidator,
         address _euros,
@@ -70,7 +71,7 @@ contract SmartVaultManagerMock is
     ) external initializer {
         __Ownable_init(msg.sender);
         // Add this if it nessary
-        // __ERC721_init("The Standard Smart Vault Manager", "TSVAULTMAN");
+        __ERC721_init("The Standard Smart Vault Manager", "TSVAULTMAN");
         setMintFeeRate(_mintFeeRate);
         setBurnFeeRate(_burnFeeRate);
         setSmartVaultDeployer(_smartVaultDeployer);
@@ -79,6 +80,7 @@ contract SmartVaultManagerMock is
         smartVaultIndexContract = ISmartVaultIndex(_smartVaultIndex);
         euros = _euros;
         tokenManager = _tokenManager;
+        collateralRate = _collateralRate;
     }
 
     function createNewVault()
@@ -102,7 +104,7 @@ contract SmartVaultManagerMock is
         );
 
         // Add the vault to the smart vault index
-        smartVaultIndexContract.addVaultAddress(lastTokenId, payable(vault));
+        smartVaultIndexContract.addVaultAddress(tokenId, payable(vault));
 
         // Grante the vault Burn and MINT role
         IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), vault);

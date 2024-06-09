@@ -2,9 +2,10 @@
 pragma solidity ^0.8.20;
 
 // import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {AggregatorV3Interface} from "./../interfaces/IChainlinkAggregatorV3.sol";
+// import {AggregatorV3Interface} from "./../interfaces/IChainlinkAggregatorV3.sol";
+import {AggregatorV3InterfaceMock} from "../mocks/AggregatorV3InterfaceMock.sol";
 
-contract ChainlinkMockForTest is AggregatorV3Interface {
+contract ChainlinkMockForTest is AggregatorV3InterfaceMock {
     string private desc;
 
     PriceRound[] private prices;
@@ -26,7 +27,7 @@ contract ChainlinkMockForTest is AggregatorV3Interface {
         prices.push(PriceRound(timestamp, price));
     }
 
-    function setPrice(int256 _price) external {
+    function setPrice(int256 _price) public {
         while (prices.length > 0) prices.pop();
         prices.push(PriceRound(block.timestamp - 4 hours, _price));
     }

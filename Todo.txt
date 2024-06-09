@@ -1,0 +1,2 @@
+[] once the new vault is deployed, Send funds directly to the vault
+Start testing smart vault functionnalities

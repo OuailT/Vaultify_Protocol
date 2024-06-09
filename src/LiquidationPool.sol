@@ -227,13 +227,13 @@ contract LiquidationPool is ILiquidationPool {
             // To prevent front-runing attacks to take advantage of rewards
             if (_pendingStake.createdAt < deadline) {
                 // READ from STORAGE once
-                Position storage position = positions[_pendingStake.holder];
+                Position storage _position = positions[_pendingStake.holder];
 
                 // update Changes in memory first
                 Position memory updatePosition = Position({
                     holder: _pendingStake.holder,
-                    tstTokens: position.tstTokens + _pendingStake.tstTokens,
-                    eurosTokens: position.eurosTokens +
+                    tstTokens: _position.tstTokens + _pendingStake.tstTokens,
+                    eurosTokens: _position.eurosTokens +
                         _pendingStake.eurosTokens
                 });
 
@@ -479,7 +479,7 @@ contract LiquidationPool is ILiquidationPool {
     }
 
     // function that returns the position of user including their pendingStake Tokens as well as rewards
-    function position(
+    function getPosition(
         address _holder
     )
         external

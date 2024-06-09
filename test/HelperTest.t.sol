@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
-// pragma solidity ^0.8.22;
+pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
+
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 ////// Import Interfaces //////
 import {ISmartVaultManagerMock} from "../src/mocks/ISmartVaultManagerMock.sol";
@@ -35,7 +38,7 @@ import {VaultifyStructs} from "./../src/libraries/VaultifyStructs.sol";
 
 // @audit-issue ASK chatGPT what cases I should test/cover
 
-contract HelperTest is Test {
+abstract contract HelperTest is Test {
     // SETUP//
     ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
@@ -44,10 +47,14 @@ contract HelperTest is Test {
     ITokenManager public tokenManagerContract;
     ISmartVaultIndex public smartVaultIndexContract;
 
-    // To store contracts address on deployement
-    address public smartVaultManager; // Euros Admin as well
-    address public liquidationPoolManager;
+    /*********************** IMPLEMENTATION *****************************/
+    address public smartVaultManagerImplementation; // Euros Admin as well
+    address public liquidationPoolManagerImplementation;
     address public pool;
+
+    /*********************** PROXIES *****************************/
+    SmartVaultManagerMock internal proxySmartVaultManager;
+    LiquidationPoolManager internal proxyLiquidityPoolManager;
 
     address public tokenManager;
     address public smartVaultIndex;
@@ -64,11 +71,7 @@ contract HelperTest is Test {
     address public wbtc;
     address public paxg;
 
-    // Actors;
-    address public owner;
     address public protocol;
-    address public liquidator;
-    address payable public treasury;
 
     ////// Oracle Contracts //////
     AggregatorV3InterfaceMock priceFeedNativeUsd;
@@ -88,29 +91,38 @@ contract HelperTest is Test {
 
     bytes32 public native;
 
+    /*************ACCOUNTS */
+    address internal admin = makeAddr("Admin");
+    address internal treasury = payable(makeAddr("Treasury"));
+    address internal liquidator = makeAddr("Liquidator");
+    address internal vaultManager = makeAddr("SmartVaultManager");
+    address internal poolManager = makeAddr("liquiditationPoolManager");
+
+    /*********************** PROXIES *****************************/
+    ProxyAdmin internal proxyAdmin;
+
     function setUp() public virtual {
-        // Create Actor //
-        owner = vm.addr(1);
-        treasury = payable(vm.addr(0x2));
-
-        vm.label(owner, "Owner");
-        vm.label(treasury, "Treasury");
-
         protocol = treasury;
 
         bytes32 _native = bytes32(abi.encodePacked("ETH"));
         native = _native;
 
-        vm.startPrank(owner);
+        vm.startPrank(admin);
+
         // Deploy Collateral assets contracts //
         tst = address(new ERC20Mock("TST", "TST", 18));
         wbtc = address(new ERC20Mock("WBTC", "WBTC", 8));
         paxg = address(new ERC20Mock("PAXG", "PAXG", 18));
+        euros = address(new EUROsMock());
+        EUROs = IEUROs(euros);
 
         // Asign contracts to their interface
         TST = IERC20Mock(tst);
         WBTC = IERC20Mock(wbtc);
         PAXG = IERC20Mock(paxg);
+
+        // Deploy the proxy admin for all system contract
+        proxyAdmin = new ProxyAdmin(address(admin));
 
         // Deploy Price Oracle contracts for assets;
         chainlinkNativeUsd = address(new ChainlinkMockForTest("ETH / USD"));
@@ -140,83 +152,94 @@ contract HelperTest is Test {
         smartVaultIndex = address(new SmartVaultIndex());
         smartVaultIndexContract = ISmartVaultIndex(smartVaultIndex);
 
-        // deploy SmartVaultManager
-        smartVaultManager = address(new SmartVaultManagerMock());
-        vm.stopPrank();
-
-        vm.startPrank(smartVaultManager);
-        euros = address(new EUROsMock());
-        EUROs = IEUROs(euros);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-
-        liquidator = address(0x5); // set liquidator address later
-
-        smartVaultManagerContract = ISmartVaultManagerMock(smartVaultManager);
-
-        // Initlize smartVaultManager
-        smartVaultManagerContract.initialize(
-            smartVaultIndex,
-            mintFeeRate,
-            burnFeeRate,
-            collateralRate,
-            protocol,
-            liquidator,
-            euros,
-            tokenManager,
-            smartVaultDeployer
+        // Deploy implementation for all the system
+        smartVaultManagerImplementation = address(new SmartVaultManagerMock());
+        liquidationPoolManagerImplementation = address(
+            new LiquidationPoolManager()
         );
 
-        // Deploy liquidationPoolManager
-        liquidationPoolManager = address(
-            new LiquidationPoolManager(
-                tst,
-                euros,
-                smartVaultManager,
-                chainlinkEurUsd,
-                treasury,
-                poolFeePercentage
+        // Deploy proxies for all the system
+        proxySmartVaultManager = SmartVaultManagerMock(
+            address(
+                new TransparentUpgradeableProxy(
+                    smartVaultManagerImplementation,
+                    address(proxyAdmin),
+                    ""
+                )
             )
         );
 
-        liquidationPoolManagerContract = ILiquidationPoolManager(
-            liquidationPoolManager
+        // NOTE: When deploying the proxy and the implementation
+        // at this stage liquidationPoolManager is disables
+        proxyLiquidityPoolManager = LiquidationPoolManager(
+            payable(
+                address(
+                    new TransparentUpgradeableProxy(
+                        liquidationPoolManagerImplementation,
+                        address(proxyAdmin),
+                        ""
+                    )
+                )
+            )
         );
 
-        // set the pool
-        pool = liquidationPoolManagerContract.pool();
+        // Initlize smartVaultManager implementation throught the proxies
+        proxySmartVaultManager.initialize({
+            _smartVaultIndex: smartVaultIndex,
+            _mintFeeRate: mintFeeRate,
+            _burnFeeRate: burnFeeRate,
+            _collateralRate: collateralRate,
+            _protocol: protocol,
+            _liquidator: liquidator,
+            _euros: euros,
+            _tokenManager: tokenManager,
+            _smartVaultDeployer: smartVaultDeployer
+        });
+
+        proxyLiquidityPoolManager.initialize({
+            _TST: tst,
+            _EUROs: euros,
+            _smartVaultManager: address(smartVaultManagerImplementation),
+            _eurUsdFeed: chainlinkEurUsd,
+            _protocol: payable(protocol),
+            _poolFeePercentage: poolFeePercentage
+        });
+
+        // deploy a new Pool
+        pool = proxyLiquidityPoolManager.createLiquidityPool();
         liquidationPoolContract = ILiquidationPool(pool);
 
         // set liquidator to liquidation pool manager contract
-        liquidator = liquidationPoolManager;
+        liquidator = poolManager;
 
         // Set actors
-        smartVaultManagerContract.setLiquidatorAddress(liquidator);
-        smartVaultIndexContract.setVaultManager(smartVaultManager);
+        smartVaultManagerContract.setLiquidatorAddress(poolManager);
+        smartVaultIndexContract.setVaultManager(vaultManager);
 
         vm.stopPrank();
     }
 
-    // function setInitialPrice() private {
-    //     // set assets Initial prices
-    //     priceFeedNativeUsd.setPrice(20); // $2200
-    //     // priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
-    //     // priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
-    //     // priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
-    // }
+    function setInitialPrice() private {
+        // Advance the block timestamp by 1 day
+        vm.warp(block.timestamp + 86400);
+        priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
+        priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
+        priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
+        priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
+    }
+
     // Slow Down
     function setAcceptedCollateral() private {
-        vm.startPrank(owner);
+        vm.startPrank(admin);
         // Add accepted collateral
         tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
         tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
         vm.stopPrank();
     }
 
-    function setUpHelper() internal {
+    function setUpHelper() internal virtual {
         setAcceptedCollateral();
-        // setInitialPrice();
+        setInitialPrice();
     }
 
     ////////// Function Utilities /////////////
@@ -252,7 +275,7 @@ contract HelperTest is Test {
             vm.startPrank(_vaultOwner);
 
             // 1- Mint a vault
-            (uint256 tokenId, address vaultAddr) = smartVaultManagerContract
+            (uint256 tokenId, address vaultAddr) = proxySmartVaultManager
                 .mintNewVault();
 
             // vault = ISmartVault(vaultAddr);

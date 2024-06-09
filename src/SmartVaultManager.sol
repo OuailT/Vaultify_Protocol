@@ -20,7 +20,7 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 /// OUAIL Allows the vault manager to set important  state variables, generate NFT metadata of the vault, deploy a new smart vault.
 /// @notice Contract managing vault deployments, controls admin data which dictates behavior of Smart Vaults.
 /// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
-
+// TODO: add interface
 contract SmartVaultManager is
     Initializable,
     ERC721Upgradeable,

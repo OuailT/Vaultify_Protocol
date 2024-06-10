@@ -24,9 +24,9 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 
 contract SmartVaultManagerMock is
     Initializable,
-    ERC721Upgradeable,
+    ContextUpgradeable,
     OwnableUpgradeable,
-    ContextUpgradeable
+    ERC721Upgradeable
 {
     using SafeERC20 for IERC20;
 
@@ -49,16 +49,16 @@ contract SmartVaultManagerMock is
     address public swapRouter2;
 
     modifier onlyLiquidator() {
-        require(msg.sender == liquidator, "err-invalid-liquidator");
+        require(_msgSender() == liquidator, "err-invalid-liquidator");
         _;
     }
 
     /// @dev To prevent the implementation contract from being used, we invoke the _disableInitializers
     /// function in the constructor to automatically lock it when it is deployed.
     /// @custom:oz-upgrades-unsafe-allow constructor
-    // constructor() {
-    //     _disableInitializers();
-    // }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _smartVaultIndex,
@@ -94,7 +94,7 @@ contract SmartVaultManagerMock is
         tokenId = lastTokenId + 1;
 
         // // Mint the smart vault to the caller
-        _safeMint(msg.sender, tokenId);
+        _safeMint(_msgSender(), tokenId);
 
         // set the tokenId to the last token Id
         lastTokenId = tokenId;
@@ -102,7 +102,7 @@ contract SmartVaultManagerMock is
         // Deploy the smart vault
         vault = ISmartVaultDeployer(smartVaultDeployer).deploy(
             address(this),
-            msg.sender,
+            _msgSender(),
             euros
         );
 
@@ -113,7 +113,7 @@ contract SmartVaultManagerMock is
         IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), vault);
         IEUROs(euros).grantRole(IEUROs(euros).BURNER_ROLE(), vault);
 
-        emit VaultifyEvents.VaultDeployed(vault, msg.sender, euros, tokenId);
+        emit VaultifyEvents.VaultDeployed(vault, _msgSender(), euros, tokenId);
     }
 
     // returns VaultifyStructs.SmartVaultData struct type array
@@ -124,7 +124,7 @@ contract SmartVaultManagerMock is
     {
         // Get vaults who belong to the user by ids from smartcontractIndex;
         uint256[] memory tokenIds = smartVaultIndexContract.getTokenIds(
-            msg.sender
+            _msgSender()
         );
 
         uint256 tokenIdsLengh = tokenIds.length;

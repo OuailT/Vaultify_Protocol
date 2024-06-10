@@ -25,9 +25,9 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 // TODO: add interface
 contract SmartVaultManager is
     Initializable,
-    ERC721Upgradeable,
+    ContextUpgradeable,
     OwnableUpgradeable,
-    ContextUpgradeable
+    ERC721Upgradeable
 {
     using SafeERC20 for IERC20;
 

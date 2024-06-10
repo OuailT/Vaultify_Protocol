@@ -51,14 +51,16 @@ contract HelperTest is Test {
     /*********************** IMPLEMENTATION *****************************/
     address public smartVaultManagerImplementation; // Euros Admin as well
     address public liquidationPoolManagerImplementation;
+    address public smartVaultIndexImplementation;
     address public pool;
 
     /*********************** PROXIES *****************************/
     SmartVaultManagerMock internal proxySmartVaultManager;
     LiquidationPoolManager internal proxyLiquidityPoolManager;
+    SmartVaultIndex internal proxySmartVaultIndex;
 
     address public tokenManager;
-    address public smartVaultIndex;
+    // address public smartVaultIndex;
     address public smartVaultDeployer;
 
     // Assets Interfaces
@@ -151,16 +153,17 @@ contract HelperTest is Test {
             new SmartVaultDeployer(native, address(chainlinkEurUsd))
         );
 
-        // deploy smartVaultIndex.sol
-        smartVaultIndex = address(new SmartVaultIndex());
+        // // deploy smartVaultIndex.sol
+        // smartVaultIndex = address(new SmartVaultIndex());
 
-        smartVaultIndexContract = ISmartVaultIndex(smartVaultIndex);
+        // smartVaultIndexContract = ISmartVaultIndex(smartVaultIndex);
 
         // Deploy implementation for all the system
         smartVaultManagerImplementation = address(new SmartVaultManagerMock());
         liquidationPoolManagerImplementation = address(
             new LiquidationPoolManager()
         );
+        smartVaultIndexImplementation = address(new SmartVaultIndex());
 
         // Deploy proxies for all the system
         proxySmartVaultManager = SmartVaultManagerMock(
@@ -174,7 +177,7 @@ contract HelperTest is Test {
         );
 
         // NOTE: When deploying the proxy and the implementation
-        // at this stage liquidationPoolManager is disables
+        // at this stage liquidationPoolManager implementation is disables
         proxyLiquidityPoolManager = LiquidationPoolManager(
             payable(
                 address(
@@ -187,9 +190,19 @@ contract HelperTest is Test {
             )
         );
 
+        proxySmartVaultIndex = SmartVaultIndex(
+            address(
+                new TransparentUpgradeableProxy(
+                    smartVaultIndexImplementation,
+                    address(proxyAdmin),
+                    ""
+                )
+            )
+        );
+
         // Initlize smartVaultManager implementation throught the proxies
         proxySmartVaultManager.initialize({
-            _smartVaultIndex: smartVaultIndex,
+            _smartVaultIndex: address(proxySmartVaultIndex),
             _mintFeeRate: mintFeeRate,
             _burnFeeRate: burnFeeRate,
             _collateralRate: collateralRate,
@@ -203,11 +216,13 @@ contract HelperTest is Test {
         proxyLiquidityPoolManager.initialize({
             _TST: tst,
             _EUROs: euros,
-            _smartVaultManager: address(smartVaultManagerImplementation),
+            _smartVaultManager: address(proxySmartVaultManager),
             _eurUsdFeed: chainlinkEurUsd,
             _protocol: payable(protocol),
             _poolFeePercentage: poolFeePercentage
         });
+
+        proxySmartVaultIndex.initialize(address(proxySmartVaultManager));
 
         // // deploy a new Pool
         pool = proxyLiquidityPoolManager.createLiquidityPool();
@@ -215,15 +230,14 @@ contract HelperTest is Test {
         liquidationPoolContract = ILiquidationPool(pool);
 
         // set liquidator to liquidation pool manager contract
-        liquidator = address(liquidationPoolManagerImplementation);
+        liquidator = address(proxyLiquidityPoolManager);
 
         // // // Set actors
         proxySmartVaultManager.setLiquidatorAddress(
-            address(liquidationPoolManagerImplementation)
+            address(proxyLiquidityPoolManager)
         );
-        smartVaultIndexContract.setVaultManager(
-            address(smartVaultManagerImplementation)
-        );
+
+        proxySmartVaultIndex.setVaultManager(address(proxySmartVaultManager));
 
         vm.stopPrank();
     }
@@ -239,15 +253,15 @@ contract HelperTest is Test {
 
     function test_SuccessfulMintingWithSufficientCollateral() public {
         console.log("Hello from the ocean!!");
-        smartVaultIndexContract.manager();
-        console.log("Smart Vault Manager", smartVaultIndexContract.manager());
 
-        vm.startPrank(alice);
-        proxySmartVaultManager.mintNewVault();
+        console.log("Smart Vault Manager", proxySmartVaultIndex.manager());
+
+        // vm.startPrank(alice);
+        // proxySmartVaultManager.mintNewVault();
         // // 1-- mint a vault
-        // ISmartVault[] memory _vaults = new ISmartVault[](1);
-        // _vaults = createVaultOwners(1);
-        // vault = _vaults[0];
+        ISmartVault[] memory _vaults = new ISmartVault[](1);
+        _vaults = createVaultOwners(1);
+        vault = _vaults[0];
         // // vaultBalanceHelper(address(vault));
         // // get the current status of the vault after sending collateral to the vault;
         // VaultifyStructs.Status memory oldStatus = vault.status();

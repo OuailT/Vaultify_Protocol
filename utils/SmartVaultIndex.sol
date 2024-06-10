@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "src/interfaces/ISmartVaultIndex.sol";
+
+import {ISmartVaultIndex} from "../src/interfaces/ISmartVaultIndex.sol";
 
 contract SmartVaultIndex is ISmartVaultIndex, Ownable {
     address public manager;

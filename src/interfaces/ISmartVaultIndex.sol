@@ -2,6 +2,7 @@
 pragma solidity ^0.8.22;
 
 interface ISmartVaultIndex {
+    function manager() external returns (address);
     function getTokenIds(
         address _user
     ) external view returns (uint256[] memory);

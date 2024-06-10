@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
+import {ContextUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {INFTMetadataGenerator} from "src/interfaces/INFTMetadataGenerator.sol";
@@ -24,7 +25,8 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 contract SmartVaultManagerMock is
     Initializable,
     ERC721Upgradeable,
-    OwnableUpgradeable
+    OwnableUpgradeable,
+    ContextUpgradeable
 {
     using SafeERC20 for IERC20;
 
@@ -69,8 +71,8 @@ contract SmartVaultManagerMock is
         address _tokenManager,
         address _smartVaultDeployer
     ) external initializer {
-        __Ownable_init(msg.sender);
-        // Add this if it nessary
+        __Ownable_init(_msgSender());
+        __Context_init();
         __ERC721_init("The Standard Smart Vault Manager", "TSVAULTMAN");
         setMintFeeRate(_mintFeeRate);
         setBurnFeeRate(_burnFeeRate);

@@ -28,7 +28,7 @@ import {SmartVaultIndex} from "./../utils/SmartVaultIndex.sol";
 import {ChainlinkMockForTest} from "../src/mocks/ChainlinkMock.sol";
 
 // Import contracts In the scope //
-import {SmartVaultManager} from "../src/SmartVaultManager.sol";
+// import {SmartVaultManager} from "../src/SmartVaultManager.sol";
 import {SmartVaultManagerMock} from "../src/mocks/SmartVaultManagerMock.sol";
 import {LiquidationPoolManager} from "../src/LiquidationPoolManager.sol";
 import {LiquidationPool} from "../src/LiquidationPool.sol";
@@ -38,7 +38,8 @@ import {VaultifyStructs} from "./../src/libraries/VaultifyStructs.sol";
 
 // @audit-issue ASK chatGPT what cases I should test/cover
 
-abstract contract HelperTest is Test {
+contract HelperTest is Test {
+    ISmartVault internal vault;
     // SETUP//
     ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
@@ -93,6 +94,7 @@ abstract contract HelperTest is Test {
 
     /*************ACCOUNTS */
     address internal admin = makeAddr("Admin");
+    address internal alice = makeAddr("Alice");
     address internal treasury = payable(makeAddr("Treasury"));
     address internal liquidator = makeAddr("Liquidator");
     address internal vaultManager = makeAddr("SmartVaultManager");
@@ -113,6 +115,7 @@ abstract contract HelperTest is Test {
         tst = address(new ERC20Mock("TST", "TST", 18));
         wbtc = address(new ERC20Mock("WBTC", "WBTC", 8));
         paxg = address(new ERC20Mock("PAXG", "PAXG", 18));
+
         euros = address(new EUROsMock());
         EUROs = IEUROs(euros);
 
@@ -150,6 +153,7 @@ abstract contract HelperTest is Test {
 
         // deploy smartVaultIndex.sol
         smartVaultIndex = address(new SmartVaultIndex());
+
         smartVaultIndexContract = ISmartVaultIndex(smartVaultIndex);
 
         // Deploy implementation for all the system
@@ -205,16 +209,21 @@ abstract contract HelperTest is Test {
             _poolFeePercentage: poolFeePercentage
         });
 
-        // deploy a new Pool
+        // // deploy a new Pool
         pool = proxyLiquidityPoolManager.createLiquidityPool();
+
         liquidationPoolContract = ILiquidationPool(pool);
 
         // set liquidator to liquidation pool manager contract
-        liquidator = poolManager;
+        liquidator = address(liquidationPoolManagerImplementation);
 
-        // Set actors
-        smartVaultManagerContract.setLiquidatorAddress(poolManager);
-        smartVaultIndexContract.setVaultManager(vaultManager);
+        // // // Set actors
+        proxySmartVaultManager.setLiquidatorAddress(
+            address(liquidationPoolManagerImplementation)
+        );
+        smartVaultIndexContract.setVaultManager(
+            address(smartVaultManagerImplementation)
+        );
 
         vm.stopPrank();
     }
@@ -226,6 +235,35 @@ abstract contract HelperTest is Test {
         priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
         priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
         priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
+    }
+
+    function test_SuccessfulMintingWithSufficientCollateral() public {
+        console.log("Hello from the ocean!!");
+        smartVaultIndexContract.manager();
+        console.log("Smart Vault Manager", smartVaultIndexContract.manager());
+
+        vm.startPrank(alice);
+        proxySmartVaultManager.mintNewVault();
+        // // 1-- mint a vault
+        // ISmartVault[] memory _vaults = new ISmartVault[](1);
+        // _vaults = createVaultOwners(1);
+        // vault = _vaults[0];
+        // // vaultBalanceHelper(address(vault));
+        // // get the current status of the vault after sending collateral to the vault;
+        // VaultifyStructs.Status memory oldStatus = vault.status();
+        // uint256 oldMinted = oldStatus.minted;
+        // uint256 oldMaxMintableEuro = oldStatus.maxMintable;
+        // uint256 oldEuroCollateral = oldStatus.totalCollateralValue;
+        // bool oldliquidated = oldStatus.liquidated;
+
+        // console.log(
+        //     "--------------------Vault Status Before Borrow------------------"
+        // );
+        // console.log("oldMinted: ", oldMinted);
+        // console.log("oldMaxMintableEuro: ", oldMaxMintableEuro);
+        // console.log("oldEuroCollateral: ", oldEuroCollateral);
+        // console.log("oldliquidated: ", oldliquidated);
+        // console.log("-----------------------------------------------------");
     }
 
     // Slow Down
@@ -263,7 +301,7 @@ abstract contract HelperTest is Test {
     ) public returns (ISmartVault[] memory) {
         // address owner;
         address _vaultOwner;
-        ISmartVault vault;
+        // ISmartVault vault;
 
         // Create a fixed sized array
         ISmartVault[] memory vaults = new ISmartVault[](_numOfOwners);
@@ -278,7 +316,7 @@ abstract contract HelperTest is Test {
             (uint256 tokenId, address vaultAddr) = proxySmartVaultManager
                 .mintNewVault();
 
-            // vault = ISmartVault(vaultAddr);
+            vault = ISmartVault(vaultAddr);
 
             // 2- Transfer collateral (Native, WBTC, and PAXG) to the vault
             // Transfer 10 ETH @ $2200, 1 BTC @ $42000, 10 PAXG @ $2000

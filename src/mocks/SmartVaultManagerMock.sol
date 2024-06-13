@@ -7,9 +7,12 @@ import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC72
 import {ContextUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {EUROsMock} from "../../src/mocks/EUROsMock.sol";
 import {INFTMetadataGenerator} from "src/interfaces/INFTMetadataGenerator.sol";
 import {IEUROs} from "src/interfaces/IEUROs.sol";
-import {ISmartVaultManager} from "src/interfaces/ISmartVaultManager.sol";
+
+import {ISmartVaultManagerMock} from "src/mocks/ISmartVaultManagerMock.sol";
+// import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import {ISmartVaultDeployer} from "src/interfaces/ISmartVaultDeployer.sol";
 import {ISmartVaultIndex} from "src/interfaces/ISmartVaultIndex.sol";
@@ -23,6 +26,7 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 /// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
 
 contract SmartVaultManagerMock is
+    ISmartVaultManagerMock,
     Initializable,
     ContextUpgradeable,
     OwnableUpgradeable,
@@ -67,7 +71,6 @@ contract SmartVaultManagerMock is
         uint256 _collateralRate,
         address _protocol,
         address _liquidator,
-        address _euros,
         address _tokenManager,
         address _smartVaultDeployer
     ) external initializer {
@@ -80,13 +83,9 @@ contract SmartVaultManagerMock is
         setProtocolAddress(_protocol);
         setLiquidatorAddress(_liquidator);
         smartVaultIndexContract = ISmartVaultIndex(_smartVaultIndex);
-        euros = _euros;
+        euros = address(new EUROsMock());
         tokenManager = _tokenManager;
         collateralRate = _collateralRate;
-    }
-
-    function name() public view override returns (string memory) {
-        super.name();
     }
 
     function mintNewVault() external returns (uint256 tokenId, address vault) {

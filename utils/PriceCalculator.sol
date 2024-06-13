@@ -2,10 +2,14 @@
 pragma solidity 0.8.22;
 
 import {AggregatorV3Interface} from "../src/interfaces/IChainlinkAggregatorV3.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+// import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20Mock} from "../src/mocks/IERC20Mock.sol";
 import {IPriceCalculator} from "../src/interfaces/IPriceCalculator.sol";
 import {VaultifyErrors} from "../src/libraries/VaultifyErrors.sol";
 import {VaultifyStructs} from "../src/libraries/VaultifyStructs.sol";
+
+// Changes for test to work
+// changed ERC20 with IERC20Mock()
 
 contract PriceCalculator is IPriceCalculator {
     bytes32 private immutable NATIVE;
@@ -76,18 +80,16 @@ contract PriceCalculator is IPriceCalculator {
     ) external view returns (uint256) {
         uint256 collateralUSD;
 
-        {
-            uint256 collateralScaled = _tokenValue *
-                10 ** getTokenScaleDiff(_token.symbol, _token.addr);
+        uint256 collateralScaled = _tokenValue *
+            10 ** getTokenScaleDiff(_token.symbol, _token.addr);
 
-            // Get the price of the TokenToEuro from oracle price Fees;
-            AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
-                _token.clAddr
-            );
+        // Get the price of the TokenToEuro from oracle price Feed;
+        AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
+            _token.clAddr
+        );
 
-            // Calculates the collateral value in USD
-            collateralUSD = collateralScaled * getPriceAvg(tokenToEuroFeed, 4);
-        }
+        // Calculates the collateral value in USD
+        collateralUSD = collateralScaled * getPriceAvg(tokenToEuroFeed, 4);
 
         // retrives the price of euroUSD
         (, int256 euroUsdPrice, uint256 euroUpdatedAt, , ) = euroUsdFeed
@@ -106,7 +108,8 @@ contract PriceCalculator is IPriceCalculator {
         bytes32 symbol,
         address tokenAddress
     ) private view returns (uint256 scaleDiff) {
-        return symbol == NATIVE ? 0 : 18 - ERC20(tokenAddress).decimals();
+        /// change ERC20 to IERC20 mock
+        return symbol == NATIVE ? 0 : 18 - IERC20Mock(tokenAddress).decimals();
     }
 
     function euroToToken(

@@ -26,7 +26,6 @@ interface ISmartVaultManagerMock {
         address,
         address,
         address,
-        address,
         address
     ) external;
 
@@ -45,5 +44,5 @@ interface ISmartVaultManagerMock {
         external
         view
         returns (VaultifyStructs.SmartVaultData[] memory);
-    function tokenURI(uint256 _tokenId) external view returns (string memory);
+    // function tokenURI(uint256 _tokenId) external view returns (string memory);
 }

@@ -4,17 +4,16 @@ pragma solidity ^0.8.22;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IEUROs} from "./interfaces/IEUROs.sol";
-import {IPriceCalculator} from "./interfaces/IPriceCalculator.sol";
-import {ISmartVault} from "./interfaces/ISmartVault.sol";
-import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
-import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
-import {ITokenManager} from "./interfaces/ITokenManager.sol";
-import {IWETH} from "./interfaces/IWETH.sol";
-
-import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
-import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
-import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
+import {IEUROs} from "src/interfaces/IEUROs.sol";
+import {IPriceCalculator} from "src/interfaces/IPriceCalculator.sol";
+import {ISmartVault} from "src/interfaces/ISmartVault.sol";
+import {ISmartVaultManager} from "src/interfaces/ISmartVaultManager.sol";
+import {IWETH} from "src/interfaces/IWETH.sol";
+import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
+import {ITokenManager} from "src/interfaces/ITokenManager.sol";
+import {VaultifyErrors} from "src/libraries/VaultifyErrors.sol";
+import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
+import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 
 contract SmartVault is ISmartVault {
     using SafeERC20 for IERC20;
@@ -86,7 +85,7 @@ contract SmartVault is ISmartVault {
     /// @notice Retrieves the Token Manager contract.
     /// @dev Calls the manager contract to get the Token Manager's address.
     /// @return The Token Manager contract.
-    function getTokenManager() private view returns (ITokenManager) {
+    function getTokenManager() public view returns (ITokenManager) {
         return ITokenManager(smartVaultManager.tokenManager());
     }
 
@@ -211,13 +210,15 @@ contract SmartVault is ISmartVault {
      * @param addr The address of the asset.
      * @return The balance of the asset.
      */
+    // Change this to IERC20Mock
     function getAssetBalance(
         bytes32 _symbol,
         address addr
-    ) internal view returns (uint256) {
-        _symbol == NATIVE
-            ? address(this).balance
-            : IERC20(addr).balanceOf(address(this));
+    ) public view returns (uint256) {
+        return
+            _symbol == NATIVE
+                ? address(this).balance
+                : IERC20(addr).balanceOf(address(this)); // change it to IERC20 mocks
     }
 
     /**

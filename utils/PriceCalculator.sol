@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.22;
 
-import {AggregatorV3Interface} from "../src/interfaces/IChainlinkAggregatorV3.sol";
+// import {AggregatorV3Interface} from "../src/interfaces/IChainlinkAggregatorV3.sol";
 // import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20Mock} from "../src/mocks/IERC20Mock.sol";
 import {IPriceCalculator} from "../src/interfaces/IPriceCalculator.sol";
 import {VaultifyErrors} from "../src/libraries/VaultifyErrors.sol";
 import {VaultifyStructs} from "../src/libraries/VaultifyStructs.sol";
+import {AggregatorV3InterfaceMock} from "src/mocks/AggregatorV3InterfaceMock.sol";
 
 // Changes for test to work
 // changed ERC20 with IERC20Mock()
+// changed AggregatorV3Interface with import
 
 contract PriceCalculator is IPriceCalculator {
     bytes32 private immutable NATIVE;
@@ -17,11 +19,11 @@ contract PriceCalculator is IPriceCalculator {
     // price Oracle Stale Threshold;
     uint256 public maxAge;
 
-    AggregatorV3Interface public euroUsdFeed;
+    AggregatorV3InterfaceMock public euroUsdFeed;
 
     constructor(bytes32 _native, address _euroUsdFeed) {
         NATIVE = _native;
-        euroUsdFeed = AggregatorV3Interface(_euroUsdFeed);
+        euroUsdFeed = AggregatorV3InterfaceMock(_euroUsdFeed);
     }
 
     // Exchange forloops for other solutions like structs
@@ -29,36 +31,28 @@ contract PriceCalculator is IPriceCalculator {
         VaultifyStructs.Token memory _token,
         uint256 _tokenValue
     ) external view returns (uint256) {
-        // Scale the _tokenValue based on the address of the token used
-        uint256 collateralUSD;
+        address tokenOracle = _token.clAddr;
+        if (tokenOracle == address(0)) revert VaultifyErrors.ZeroAddress();
+        // Get the price of the TokenToEuro from oracle price Fees;
+        AggregatorV3InterfaceMock tokenUsdFeed = AggregatorV3InterfaceMock(
+            _token.clAddr
+        );
 
-        {
-            uint256 collateralScaled = _tokenValue *
-                10 ** getTokenScaleDiff(_token.symbol, _token.addr);
+        uint256 collateralScaled = _tokenValue *
+            10 ** getTokenScaleDiff(_token.symbol, _token.addr);
 
-            // Get the price of the TokenToEuro from oracle price Fees;
-            AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
-                _token.clAddr
-            );
+        // Retieves the price of token in USD
+        (, int256 tokenUsdPrice, uint256 tokenUpdatedAt, , ) = tokenUsdFeed
+            .latestRoundData();
 
-            // Retieves the price of token in USD
-            (
-                ,
-                int256 tokenUsdPrice,
-                uint256 tokenUpdatedAt,
-                ,
+        if (tokenUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
 
-            ) = tokenToEuroFeed.latestRoundData();
-
-            if (tokenUsdPrice <= 0) revert VaultifyErrors.InvalidPrice();
-
-            if (block.timestamp - tokenUpdatedAt < maxAge) {
-                revert VaultifyErrors.PriceStale();
-            }
-
-            // Calculates the collateral value in USD
-            collateralUSD = collateralScaled * uint256(tokenUsdPrice);
+        if (block.timestamp - tokenUpdatedAt < maxAge) {
+            revert VaultifyErrors.PriceStale();
         }
+
+        // Calculates the collateral value in USD
+        uint256 collateralUSD = collateralScaled * uint256(tokenUsdPrice);
 
         // retrives the price of euroUSD
         (, int256 euroUsdPrice, uint256 euroUpdatedAt, , ) = euroUsdFeed
@@ -78,18 +72,21 @@ contract PriceCalculator is IPriceCalculator {
         VaultifyStructs.Token memory _token,
         uint256 _tokenValue
     ) external view returns (uint256) {
-        uint256 collateralUSD;
+        // Get the price of the TokenToEuro from oracle price Feed;
+        AggregatorV3InterfaceMock tokenUsdFeed = AggregatorV3InterfaceMock(
+            _token.clAddr
+        );
 
         uint256 collateralScaled = _tokenValue *
             10 ** getTokenScaleDiff(_token.symbol, _token.addr);
 
-        // Get the price of the TokenToEuro from oracle price Feed;
-        AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
-            _token.clAddr
-        );
+        // Retieves the price of token in USD
+        (, int256 tokenUsdPrice, uint256 tokenUpdatedAt, , ) = tokenUsdFeed
+            .latestRoundData();
 
         // Calculates the collateral value in USD
-        collateralUSD = collateralScaled * getPriceAvg(tokenToEuroFeed, 4);
+        // uint256 collateralUSD = collateralScaled * getPriceAvg(tokenUsdFeed, 4);
+        uint256 collateralUSD = collateralScaled * uint256(tokenUsdPrice);
 
         // retrives the price of euroUSD
         (, int256 euroUsdPrice, uint256 euroUpdatedAt, , ) = euroUsdFeed
@@ -105,11 +102,11 @@ contract PriceCalculator is IPriceCalculator {
     }
 
     function getTokenScaleDiff(
-        bytes32 symbol,
-        address tokenAddress
+        bytes32 _symbol,
+        address _tokenAddr
     ) private view returns (uint256 scaleDiff) {
         /// change ERC20 to IERC20 mock
-        return symbol == NATIVE ? 0 : 18 - IERC20Mock(tokenAddress).decimals();
+        return _symbol == NATIVE ? 0 : 18 - IERC20Mock(_tokenAddr).decimals();
     }
 
     function euroToToken(
@@ -117,12 +114,12 @@ contract PriceCalculator is IPriceCalculator {
         uint256 _euroValue
     ) external view returns (uint256) {
         // Get the price of the TokenToEuro from oracle price Fees;
-        AggregatorV3Interface tokenToEuroFeed = AggregatorV3Interface(
+        AggregatorV3InterfaceMock tokenUsdFeed = AggregatorV3InterfaceMock(
             _token.clAddr
         );
 
         // Retieves the price of token in USD
-        (, int256 tokenUsdPrice, uint256 tokenUpdatedAt, , ) = tokenToEuroFeed
+        (, int256 tokenUsdPrice, uint256 tokenUpdatedAt, , ) = tokenUsdFeed
             .latestRoundData();
 
         // Check tokenToEuro price freshness
@@ -148,7 +145,7 @@ contract PriceCalculator is IPriceCalculator {
     }
 
     function getPriceAvg(
-        AggregatorV3Interface _tokenFeed,
+        AggregatorV3InterfaceMock _tokenFeed,
         uint8 _period
     ) private view returns (uint256) {
         uint80 roundId;

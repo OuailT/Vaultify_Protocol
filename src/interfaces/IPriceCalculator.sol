@@ -2,7 +2,6 @@
 pragma solidity ^0.8.22;
 
 import {VaultifyStructs} from "../libraries/VaultifyStructs.sol";
-import {AggregatorV3Interface} from "./IChainlinkAggregatorV3.sol";
 
 interface IPriceCalculator {
     function tokenToEuro(

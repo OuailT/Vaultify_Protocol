@@ -251,7 +251,7 @@ abstract contract HelperTest is Test {
         vm.warp(block.timestamp + 86400);
         priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
         priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
-        priceFeedwBtcUsd.setPrice(42_000 * 1e8); // $42000
+        priceFeedwBtcUsd.setPrice(42000 * 1e8); // $42000
         priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
     }
 
@@ -310,10 +310,13 @@ abstract contract HelperTest is Test {
             // 2- Transfer collateral (Native, WBTC, and PAXG) to the vault
             // Transfer 10 ETH @ $2200, 1 BTC @ $42000, 10 PAXG @ $2000
             // Total initial collateral value: $84,000 or EUR76,107
-            (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
-            require(sent, "Native ETH trx failed");
+            // (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
+            // require(sent, "Native ETH trx failed");
+            // 10 ETH in EUROs based on the current price
+            // 10 * 2200 / (1.1037) EUR/USD exchange rate =  10 ETH  == 19931.56 EUR; [x] correct
+
             WBTC.transfer(vaultAddr, 1 * 1e18);
-            PAXG.transfer(vaultAddr, 10 * 1e18);
+            // PAXG.transfer(vaultAddr, 10 * 1e18);
 
             console.log("VaultAddress from helper", vaultAddr);
 
@@ -324,6 +327,7 @@ abstract contract HelperTest is Test {
                 .getTokenManager()
                 .getAcceptedTokens();
 
+            // ETH
             VaultifyStructs.Token memory token = tokens[1];
             console.log("token address", token.addr);
 
@@ -339,8 +343,14 @@ abstract contract HelperTest is Test {
             // );
             // console.log("balance In WBTC ", balanceInWBTC);
 
-            // address tokenManagerV = proxySmartVaultManager.tokenManager();
-            // console.log("tokenManager addreess", tokenManagerV);
+            // TODO Get the price feed from the ChainLink Oracle price feeds[x]
+            // NOTE maybe the price for Native is not SET as it not added as token so there is not address
+            // WRONG : all price are well set.
+            // to check every function @audit-info must call tokenToEuro function from price calculator
+
+            /// $$$$$$$$$$$$$$$$$$$$$$ ///
+            /// TODO: Set one collateral at the time and compare retrive it value in EUROs and add more
+            // compare it to other and see from were the problem is comming from
 
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188

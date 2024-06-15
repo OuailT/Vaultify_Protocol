@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 
-import "../src/mocks/AggregatorV3InterfaceMock.sol";
+import {AggregatorV3InterfaceMock} from "src/mocks/AggregatorV3InterfaceMock.sol";
 
-contract ChainlinkMockForTest is AggregatorV3Interface {
+contract ChainlinkMockForTest is AggregatorV3InterfaceMock {
     string private desc;
     PriceRound[] private prices;
 
@@ -25,6 +25,7 @@ contract ChainlinkMockForTest is AggregatorV3Interface {
     }
 
     function setPrice(int256 _price) external {
+        while (prices.length > 0) prices.pop();
         prices.push(PriceRound(block.timestamp, _price));
     }
 

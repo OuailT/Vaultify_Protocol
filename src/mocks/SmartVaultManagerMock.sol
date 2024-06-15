@@ -34,7 +34,7 @@ contract SmartVaultManagerMock is
 {
     using SafeERC20 for IERC20;
 
-    uint256 public constant HUNDRED_PRC = 1e5;
+    uint256 public constant HUNDRED_PRC = 1e5; // 100%;
 
     address public protocol;
     address public liquidator;

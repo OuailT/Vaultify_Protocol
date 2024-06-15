@@ -124,7 +124,7 @@ contract SmartVault is ISmartVault {
 
         // The amount of collateral held in the vault in EUROs after the swap
         uint256 collateralValueMinusSwapValue = euroCollateral() -
-            calculator.tokenToEuro(getToken(_inTokenSymbol), _amount);
+            calculator.tokenToEuroAvg(getToken(_inTokenSymbol), _amount);
 
         // Before swap make sure that the vault remains collateralized after swap:
         // If collateralValueMinusSwapValue >= requiredCollateralValue = Vault/address(this) remain collateralized after receiving tokenOut.

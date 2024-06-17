@@ -19,10 +19,9 @@ import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 
 /// @title SmartVaultManager
-/// OUAIL Allows the vault manager to set important  state variables, generate NFT metadata of the vault, deploy a new smart vault.
+// Allows the vault manager to set important  state variables, generate NFT metadata of the vault, deploy a new smart vault.
 /// @notice Contract managing vault deployments, controls admin data which dictates behavior of Smart Vaults.
-/// @dev Manages fee rates, collateral rates, dependency addresses, managed by The Standard.
-// TODO: add interface
+/// @dev Manages fee rates, collateral rates, dependency addresses, managed by the protocol.
 contract SmartVaultManager is
     Initializable,
     ContextUpgradeable,

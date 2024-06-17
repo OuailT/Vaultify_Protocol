@@ -248,7 +248,8 @@ abstract contract HelperTest is Test {
 
     function setInitialPrice() private {
         // Advance the block timestamp by 1 day
-        vm.warp(block.timestamp + 86400);
+        vm.warp(block.timestamp + 86400); // @audit-info put this at the end of the setup in case the problem of eurocollateral isn't solved
+        // standard precision provided by price oracles like Chainlink.
         priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
         priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
         priceFeedwBtcUsd.setPrice(42000 * 1e8); // $42000
@@ -287,11 +288,7 @@ abstract contract HelperTest is Test {
 
     function createVaultOwners(
         uint256 _numOfOwners
-    ) public returns (ISmartVault[] memory) {
-        // address owner;
-        address _vaultOwner;
-        // ISmartVault vault;
-
+    ) public returns (ISmartVault[] memory, address _vaultOwner) {
         // Create a fixed sized array
         ISmartVault[] memory vaults = new ISmartVault[](_numOfOwners);
 
@@ -310,17 +307,22 @@ abstract contract HelperTest is Test {
             // 2- Transfer collateral (Native, WBTC, and PAXG) to the vault
             // Transfer 10 ETH @ $2200, 1 BTC @ $42000, 10 PAXG @ $2000
             // Total initial collateral value: $84,000 or EUR76,107
-            // (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
-            // require(sent, "Native ETH trx failed");
+            (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
+            require(sent, "Native ETH trx failed");
+
+            //-----------------------------------------------//
             // 10 ETH in EUROs based on the current price
             // 10 * 2200 / (1.1037) EUR/USD exchange rate =  10 ETH  == 19931.56 EUR; [x] correct
-
-            WBTC.transfer(vaultAddr, 1 * 1e18);
-            // PAXG.transfer(vaultAddr, 10 * 1e18);
+            //-----------------------------------------------//
+            // 1 WBTC * 42000 / (1.1037) EUR/USD exchange rate = 1 WTBC == 38052.87 EUR [x] correct
+            WBTC.transfer(vaultAddr, 1 * 1e8);
+            //-----------------------------------------------//
+            PAXG.transfer(vaultAddr, 10 * 1e18);
+            // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
 
             console.log("VaultAddress from helper", vaultAddr);
 
-            // TODO  test if getTokenManaer.getacceptedTokens() is implemented correctly
+            // TODO test if getTokenManaer.getacceptedTokens() is implemented correctly
             // returns the same TokenManager address
 
             VaultifyStructs.Token[] memory tokens = vault
@@ -364,6 +366,6 @@ abstract contract HelperTest is Test {
             vaults[i] = vault;
         }
 
-        return vaults;
+        return (vaults, _vaultOwner);
     }
 }

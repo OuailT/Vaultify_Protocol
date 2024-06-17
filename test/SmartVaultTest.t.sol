@@ -27,38 +27,20 @@ contract SmartVaultTest is HelperTest {
         console.log("Hello from the ocean!!");
         // // 1-- mint a vault
         ISmartVault[] memory _vaults = new ISmartVault[](1);
-        _vaults = createVaultOwners(1);
+        (_vaults, alice) = createVaultOwners(1);
         vault = _vaults[0];
 
         vaultBalanceHelper(address(vault));
 
-        // TODO
-        // return the address of the getTokenManager from smart vault to check of it return the correct address of
-        // Return the tokenManager from the smartVaultManager
-
-        // Token manager from the proxy;
-        // address tokenManagerV = proxySmartVaultManager.tokenManager();
-        // console.log("tokenManager addreess", tokenManagerV);
-
-        // get tokenManager address from smart vault;
-
-        // get token by symbol(WBTC)
-        // VaultifyStructs.Token memory _token = vault.getToken(
-        //     bytes32(
-        //         0x5742544300000000000000000000000000000000000000000000000000000000
-        //     )
-        // );
-
-        // console.logBytes32(_token.symbol);
-        // console.log("token decimals", _token.dec);
-
-        // get the current status of the vault after sending collateral to the vault;
+        // get the current status of the vault after sending collaterals to the vault;
         VaultifyStructs.Status memory oldStatus = vault.status();
         address vaultAddress = oldStatus.vaultAddress;
         uint256 oldMinted = oldStatus.minted;
-        uint256 oldMaxMintableEuro = oldStatus.maxMintable;
-        uint256 oldEuroCollateral = oldStatus.totalCollateralValue;
+        uint256 oldMaxMintableEuro = oldStatus.maxMintable; // 69,188 EUROS
+        uint256 oldEuroCollateral = oldStatus.totalCollateralValue; // 76,107 EUROS
         bool oldliquidated = oldStatus.liquidated;
+        // NOTE: I CAN BORROW 90.86% of EUROS out of 76.107 EUROS
+
         //---------------------------------------------------------//
         //     "--------------------Vault Status Before Borrow------------------"
         // );
@@ -69,9 +51,25 @@ contract SmartVaultTest is HelperTest {
         console.log("oldliquidated: ", oldliquidated);
         console.log("-----------------------------------------------------");
 
-        // // Test getAssetBalance
-        // uint256 Balance = vault.euroCollateral(address(vault));
-        // console.log("balance", Balance);
+        vm.startPrank(alice);
+        //******** BORROW maxMintable */
+
+        vault.borrowMint(55 * 1e18);
+
+        // get the current status of the vault after sending collaterals to the vault;
+        VaultifyStructs.Status memory newStatus = vault.status();
+        uint256 newMinted = newStatus.minted;
+        uint256 newMaxMintable = newStatus.maxMintable; // 69,188 EUROS
+        uint256 newEurosCollateral = newStatus.totalCollateralValue; // 76,107 EUROS
+        bool newLiquidated = newStatus.liquidated;
+        // NOTE: I CAN BORROW 90.86% of EUROS out of 76.107 EUROS
+
+        console.log("newMinted: ", newMinted);
+        console.log("newMaxMintable: ", newMaxMintable);
+        console.log("newEurosCollateral: ", newEurosCollateral);
+        console.log("newLiquidated: ", newLiquidated);
+
+        vm.stopPrank();
     }
 
     function vaultBalanceHelper(address _vault) public {

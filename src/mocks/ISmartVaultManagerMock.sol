@@ -6,6 +6,7 @@ import {VaultifyStructs} from "../libraries/VaultifyStructs.sol";
 interface ISmartVaultManagerMock {
     function HUNDRED_PRC() external view returns (uint256);
     function lastTokenId() external view returns (uint256);
+    function euros() external view returns (address);
     function tokenManager() external view returns (address);
     function liquidator() external view returns (address);
     function protocol() external view returns (address);
@@ -18,11 +19,13 @@ interface ISmartVaultManagerMock {
     function swapRouter() external view returns (address);
     function swapFeeRate() external view returns (uint256);
     function setLiquidatorAddress(address _liquidator) external;
+
     function initialize(
         address,
         uint256,
         uint256,
         uint256,
+        address,
         address,
         address,
         address,

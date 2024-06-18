@@ -123,11 +123,6 @@ abstract contract HelperTest is Test {
         vm.label(wbtc, "WBTC");
         vm.label(paxg, "PAXG");
 
-        euros = address(new EUROsMock());
-        EUROs = IEUROs(euros);
-
-        EUROs.grantRole(EUROs.MINTER_ROLE(), address(proxySmartVaultManager));
-
         // IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), address(vault));
 
         // Asign contracts to their interface
@@ -209,6 +204,16 @@ abstract contract HelperTest is Test {
             )
         );
 
+        vm.stopPrank();
+
+        // Deploy the EUROS conract by proxySmartVaultManager to set it ad DEFAULT_ADMIN as it the contract
+        // were newMintVault is created and should grant Burner and Minter roles to new Created Vault;
+        vm.startPrank(address(proxySmartVaultManager));
+        euros = address(new EUROsMock());
+        EUROs = IEUROs(euros);
+        vm.stopPrank();
+
+        vm.startPrank(address(admin));
         // Initlize smartVaultManager implementation throught the proxies
         proxySmartVaultManager.initialize({
             _smartVaultIndex: address(proxySmartVaultIndex),
@@ -218,7 +223,8 @@ abstract contract HelperTest is Test {
             _protocol: protocol,
             _liquidator: liquidator,
             _tokenManager: tokenManager,
-            _smartVaultDeployer: smartVaultDeployer
+            _smartVaultDeployer: smartVaultDeployer,
+            _euros: euros
         });
 
         proxyLiquidityPoolManager.initialize({
@@ -263,6 +269,7 @@ abstract contract HelperTest is Test {
     // Slow Down
     function setAcceptedCollateral() private {
         vm.startPrank(admin);
+        console.log("euros address", proxySmartVaultManager.euros());
         // Add accepted collateral
         tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
         tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
@@ -289,8 +296,6 @@ abstract contract HelperTest is Test {
 
         return user;
     }
-
-    // createVaultOwners(uint256(1));
 
     function createVaultOwners(
         uint256 _numOfOwners
@@ -325,56 +330,13 @@ abstract contract HelperTest is Test {
             PAXG.transfer(vaultAddr, 10 * 1e18);
             // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
 
-            console.log("VaultAddress from helper", vaultAddr);
-
-            // TODO test if getTokenManaer.getacceptedTokens() is implemented correctly
-            // returns the same TokenManager address
-
-            // VaultifyStructs.Token[] memory tokens = vault
-            //     .getTokenManager()
-            //     .getAcceptedTokens();
-
-            // // ETH
-            // VaultifyStructs.Token memory token = tokens[1];
-            // console.log("token address", token.addr);
-
-            // [x]
-            // VaultifyStructs.Token[] memory tokens = tokenManagerContract
-            //     .getAcceptedTokens();
-            // VaultifyStructs.Token memory token = tokens[1];
-            // console.log("token address", token.addr);
-
-            // uint256 balanceInWBTC = vault.getAssetBalance(
-            //     token.symbol,
-            //     token.addr
-            // );
-            // console.log("balance In WBTC ", balanceInWBTC);
-
-            // TODO Get the price feed from the ChainLink Oracle price feeds[x]
-            // NOTE maybe the price for Native is not SET as it not added as token so there is not address
-            // WRONG : all price are well set.
-            // to check every function @audit-info must call tokenToEuro function from price calculator
-
-            /// $$$$$$$$$$$$$$$$$$$$$$ ///
-            /// TODO: Set one collateral at the time and compare retrive it value in EUROs and add more
-            // compare it to other and see from were the problem is comming from
-
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188
 
             // mint/borrow Euros from the vault
             // Vault borrower can borrow up to // 69,188 EUR || 80%
-            vault.borrowMint(_vaultOwner, 50_350 * 1e18);
-            EUROs.hasRole((EUROs.MINTER_ROLE()), address(vault));
-            EUROs.hasRole(
-                (EUROs.MINTER_ROLE()),
-                address(proxySmartVaultManager)
-            );
-            // 0xd9A284367b6D3e25A91c91b5A430AF2593886EB9 => who is address is this?
-            console.log("vault Owner Address", _vaultOwner);
-            // NOTE nether the proxy nor the vault have the minter role? test minNewVault
-            console.log("Alice address", alice);
-            console.log("vault owner balance", EUROs.balanceOf(_vaultOwner));
+            // vault.borrowMint(_vaultOwner, 50_350 * 1e18);
+
             vm.stopPrank();
 
             vaults[i] = vault;

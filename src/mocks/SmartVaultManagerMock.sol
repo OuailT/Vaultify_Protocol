@@ -108,9 +108,9 @@ contract SmartVaultManagerMock is
         // // Add the vault to the smart vault index
         smartVaultIndexContract.addVaultAddress(tokenId, payable(vault));
 
-        // Grante the vault Burn and MINT role
-        IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), vault);
-        IEUROs(euros).grantRole(IEUROs(euros).BURNER_ROLE(), vault);
+        // // Grante the vault Burn and MINT role
+        IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), address(vault));
+        IEUROs(euros).grantRole(IEUROs(euros).BURNER_ROLE(), address(vault));
 
         emit VaultifyEvents.VaultDeployed(vault, _msgSender(), euros, tokenId);
     }

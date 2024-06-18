@@ -12,7 +12,7 @@ interface ISmartVault {
     function underCollateralised() external view returns (bool);
     function setOwner(address _newOwner) external;
     function liquidate() external;
-    function borrowMint(uint256 _amount) external;
+    function borrowMint(address _to, uint256 _amount) external;
     function burnEuros(uint256 _amount) external;
     function getTokenManager() external view returns (ITokenManager);
     function swap(

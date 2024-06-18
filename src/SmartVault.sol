@@ -300,18 +300,12 @@ contract SmartVault is ISmartVault {
      * @param _amount The amount of tokens to mint.
      */
     function borrowMint(
+        address _to,
         uint256 _amount
     ) external ifNotLiquidated onlyVaultOwner {
         // Get the borrow/mint Euro Fee
         uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
-
-        // uint256 maxMintable = MaxMintableEuros();
-        // uint256 newMintedEuros = mintedEuros + _amount;
-
-        // if (newMintedEuros > maxMintable) {
-        //     revert VaultifyErrors.UnderCollateralisedVault(address(this));
-        // }
 
         if (!fullyCollateralised(_amount)) {
             revert VaultifyErrors.UnderCollateralisedVault(address(this));
@@ -319,12 +313,12 @@ contract SmartVault is ISmartVault {
 
         mintedEuros += _amount;
 
-        // mintedEuros = newMintedEuros;
-        EUROs.mint(msg.sender, _amount - fee);
+        EUROs.mint(_to, _amount - fee);
 
         // Fees goes to the vault liquidator
-        EUROs.mint(smartVaultManager.protocol(), fee);
-        emit VaultifyEvents.EUROsMinted(msg.sender, _amount - fee, fee);
+        EUROs.mint(smartVaultManager.liquidator(), fee);
+
+        emit VaultifyEvents.EUROsMinted(_to, _amount - fee, fee);
     }
 
     /**

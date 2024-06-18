@@ -16,77 +16,109 @@ contract SmartVaultTest is HelperTest {
         super.setUpHelper();
     }
 
-    ////////////// Mint/Euros functions by Owner /////////////////
-
-    /**
-     - testSuccessfulMintingWithSufficientCollateral 
-     - testMintingWithoutSufficientCollateral
-    */
-
-    function test_SuccessfulMintingWithSufficientCollateral() public {
-        console.log("Hello from the ocean!!");
-        // // 1-- mint a vault
-        ISmartVault[] memory _vaults = new ISmartVault[](1);
-        (_vaults, alice) = createVaultOwners(1);
-        vault = _vaults[0];
-
-        vaultBalanceHelper(address(vault));
-
-        // get the current status of the vault after sending collaterals to the vault;
-        VaultifyStructs.Status memory oldStatus = vault.status();
-        address vaultAddress = oldStatus.vaultAddress;
-        uint256 oldMinted = oldStatus.minted;
-        uint256 oldMaxMintableEuro = oldStatus.maxMintable; // 69,188 EUROS
-        uint256 oldEuroCollateral = oldStatus.totalCollateralValue; // 76,107 EUROS
-        bool oldliquidated = oldStatus.liquidated;
-        // NOTE: I CAN BORROW 90.86% of EUROS out of 76.107 EUROS
-
-        //---------------------------------------------------------//
-        //     "--------------------Vault Status Before Borrow------------------"
-        // );
-        console.log("Vault Address: ", vaultAddress);
-        console.log("oldMinted: ", oldMinted);
-        console.log("oldMaxMintableEuro: ", oldMaxMintableEuro);
-        console.log("oldEuroCollateral: ", oldEuroCollateral);
-        console.log("oldliquidated: ", oldliquidated);
-        console.log("-----------------------------------------------------");
-
-        vm.startPrank(alice);
-        //******** BORROW maxMintable */
-
-        vault.borrowMint(55 * 1e18);
-
-        // get the current status of the vault after sending collaterals to the vault;
-        VaultifyStructs.Status memory newStatus = vault.status();
-        uint256 newMinted = newStatus.minted;
-        uint256 newMaxMintable = newStatus.maxMintable; // 69,188 EUROS
-        uint256 newEurosCollateral = newStatus.totalCollateralValue; // 76,107 EUROS
-        bool newLiquidated = newStatus.liquidated;
-        // NOTE: I CAN BORROW 90.86% of EUROS out of 76.107 EUROS
-
-        console.log("newMinted: ", newMinted);
-        console.log("newMaxMintable: ", newMaxMintable);
-        console.log("newEurosCollateral: ", newEurosCollateral);
-        console.log("newLiquidated: ", newLiquidated);
-
-        vm.stopPrank();
+    function test_helperFunction() public {
+        createVaultOwners(1);
     }
 
-    function vaultBalanceHelper(address _vault) public {
-        console.log(
-            "----------------------Vault balance in Collateral-------------------------------"
-        );
+    // /**** Test for Maximum Mintable Amount ****/
+    // function test_MaximumMintableAmount() public {
+    //     console.log("Testing maximum mintable amount");
 
-        console.log("Vault ETH balance: ", _vault.balance / 1e18, "ETH");
-        console.log(
-            "Vault WBTC balance: ",
-            WBTC.balanceOf(_vault) / 1e18,
-            "WTBC"
-        );
-        console.log(
-            "Vault WBTC balance: ",
-            PAXG.balanceOf(_vault) / 1e18,
-            "PAXG"
-        );
-    }
+    //     // Step 1: Mint a vault and transfer collateral
+    //     ISmartVault[] memory _vaults = new ISmartVault[](1);
+    //     (_vaults, alice) = createVaultOwners(1);
+    //     vault = _vaults[0];
+
+    //     // Step 2: Get initial status of the vault
+    //     VaultifyStructs.Status memory initialStatus = vault.status();
+    //     uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+    //     uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
+
+    //     vm.startPrank(alice);
+
+    //     // Step 3: Mint the maximum allowable euros
+    //     vault.borrowMint(alice, initialMaxMintableEuro);
+
+    //     // Step 4: Get new status of the vault
+    //     VaultifyStructs.Status memory newStatus = vault.status();
+    //     assertEq(newStatus.minted, initialMaxMintableEuro);
+    //     assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+    //     assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
+
+    //     vm.stopPrank();
+    // }
+
+    // /**** Test for Successful Minting with Sufficient Collateral ****/
+    // function test_SuccessfulMintingWithSufficientCollateral() public {
+    //     console.log("Testing successful minting with sufficient collateral");
+
+    //     // Step 1: Mint a vault and transfer collateral
+    //     ISmartVault[] memory _vaults = new ISmartVault[](1);
+    //     (_vaults, alice) = createVaultOwners(1);
+    //     vault = _vaults[0];
+
+    //     // Step 2: Get initial status of the vault
+    //     VaultifyStructs.Status memory initialStatus = vault.status();
+    //     uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+    //     uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
+
+    //     vm.startPrank(alice);
+
+    //     // Step 3: Mint a specific amount
+    //     uint256 mintAmount = 55000 * 1e18; // Example mint amount
+    //     vault.borrowMint(alice, mintAmount);
+
+    //     // Step 4: Get new status of the vault
+    //     VaultifyStructs.Status memory newStatus = vault.status();
+    //     assertEq(newStatus.minted, mintAmount);
+    //     assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+    //     assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
+
+    //     vm.stopPrank();
+    // }
+
+    /**** Test for Minting with Fee Deduction ****/
+    // function test_MintingWithFeeDeduction() public {
+    //     console.log("Testing minting with fee deduction");
+
+    //     // Step 1: Mint a vault and transfer collateral
+    //     ISmartVault[] memory _vaults = new ISmartVault[](1);
+    //     (_vaults, alice) = createVaultOwners(1);
+    //     vault = _vaults[0];
+
+    //     // Step 2: Get initial status of the vault
+    //     VaultifyStructs.Status memory initialStatus = vault.status();
+    //     uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+    //     uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
+
+    //     vm.startPrank(_vaultOwner);
+
+    //     // Step 3: Mint a specific amount and check fee deduction
+    //     uint256 mintAmount = 50000 * 1e18;
+    //     uint256 fee = (mintAmount * proxySmartVaultManager.mintFeeRate()) /
+    //         proxySmartVaultManager.HUNDRED_PRC();
+
+    //     console.log("Fee on the 50_000 EUROS", fee);
+    //     vault.borrowMint(address(_vaultOwner), mintAmount);
+
+    //     // Step 4: Get new status of the vault
+    //     VaultifyStructs.Status memory newStatus = vault.status();
+    //     assertEq(newStatus.minted, mintAmount);
+
+    //     console.log(
+    //         "Alice Balance after mint",
+    //         EUROs.balanceOf(address(_vaultOwner))
+    //     );
+
+    //     // assertEq(
+    //     //     EUROs.balanceOf(alice),
+    //     //     mintAmount - fee,
+    //     //     "Fee aren't deducted"
+    //     // );
+    //     // assertEq(EUROs.balanceOf(proxySmartVaultManager.liquidator()), fee);
+    //     // assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+    //     // assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
+
+    //     vm.stopPrank();
+    // }
 }

@@ -126,6 +126,10 @@ abstract contract HelperTest is Test {
         euros = address(new EUROsMock());
         EUROs = IEUROs(euros);
 
+        EUROs.grantRole(EUROs.MINTER_ROLE(), address(proxySmartVaultManager));
+
+        // IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), address(vault));
+
         // Asign contracts to their interface
         TST = IERC20Mock(tst);
         WBTC = IERC20Mock(wbtc);
@@ -286,6 +290,8 @@ abstract contract HelperTest is Test {
         return user;
     }
 
+    // createVaultOwners(uint256(1));
+
     function createVaultOwners(
         uint256 _numOfOwners
     ) public returns (ISmartVault[] memory, address _vaultOwner) {
@@ -295,7 +301,6 @@ abstract contract HelperTest is Test {
         for (uint256 i = 0; i < _numOfOwners; i++) {
             // create vault owners;
             _vaultOwner = createUser(i, 100);
-
             vm.startPrank(_vaultOwner);
 
             // 1- Mint a vault
@@ -325,13 +330,13 @@ abstract contract HelperTest is Test {
             // TODO test if getTokenManaer.getacceptedTokens() is implemented correctly
             // returns the same TokenManager address
 
-            VaultifyStructs.Token[] memory tokens = vault
-                .getTokenManager()
-                .getAcceptedTokens();
+            // VaultifyStructs.Token[] memory tokens = vault
+            //     .getTokenManager()
+            //     .getAcceptedTokens();
 
-            // ETH
-            VaultifyStructs.Token memory token = tokens[1];
-            console.log("token address", token.addr);
+            // // ETH
+            // VaultifyStructs.Token memory token = tokens[1];
+            // console.log("token address", token.addr);
 
             // [x]
             // VaultifyStructs.Token[] memory tokens = tokenManagerContract
@@ -359,8 +364,17 @@ abstract contract HelperTest is Test {
 
             // mint/borrow Euros from the vault
             // Vault borrower can borrow up to // 69,188 EUR || 80%
-            // vault.borrowMint(_vaultOwner, 50_350 * 1e18);
-
+            vault.borrowMint(_vaultOwner, 50_350 * 1e18);
+            EUROs.hasRole((EUROs.MINTER_ROLE()), address(vault));
+            EUROs.hasRole(
+                (EUROs.MINTER_ROLE()),
+                address(proxySmartVaultManager)
+            );
+            // 0xd9A284367b6D3e25A91c91b5A430AF2593886EB9 => who is address is this?
+            console.log("vault Owner Address", _vaultOwner);
+            // NOTE nether the proxy nor the vault have the minter role? test minNewVault
+            console.log("Alice address", alice);
+            console.log("vault owner balance", EUROs.balanceOf(_vaultOwner));
             vm.stopPrank();
 
             vaults[i] = vault;

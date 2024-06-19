@@ -333,6 +333,7 @@ contract SmartVault is ISmartVault {
             msg.sender,
             address(this)
         ) >= _amount;
+
         // we already give the the contract the allowance amount which deduct the fee from?
         // Why do we give the contract an approval again throught delegate call to spend the fee as the fee is already part of the amount
 
@@ -340,8 +341,13 @@ contract SmartVault is ISmartVault {
 
         uint256 fee = (_amount * smartVaultManager.burnFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
-
+        // 50_000 EUROS - Fee = Amount to brun therefore, burn can only
+        // with the amount that alice has of euros.
         mintedEuros -= _amount;
+        // @audit-info if the user burns all his token to removecollateral
+        // will not be able to do so as mintedEuros will remain !0
+        // there fore I should look at a way to update minted Euros correctly
+        // use different approch to update rather than the current
 
         EUROs.burn(msg.sender, _amount - fee);
 

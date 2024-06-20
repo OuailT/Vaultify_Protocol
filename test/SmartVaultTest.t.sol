@@ -33,38 +33,14 @@ contract SmartVaultTest is HelperTest {
 
         vm.startPrank(alice);
 
-        // Step 3: Mint the maximum allowable euros minus Fees;
-
-        // Calculate the maximum mintable amount considering the fee
-        uint256 hundredPrc = proxySmartVaultManager.HUNDRED_PRC();
-        uint256 maxMintableWithFee = (initialMaxMintableEuro * hundredPrc) /
-            (hundredPrc + mintFeeRate);
-
-        uint256 fee = (initialMaxMintableEuro *
-            proxySmartVaultManager.mintFeeRate()) /
-            proxySmartVaultManager.HUNDRED_PRC();
-
-        vault.borrowMint(alice, maxMintableWithFee);
+        // Step 3: Mint the maximum allowable euros
+        vault.borrowMint(alice, initialMaxMintableEuro);
 
         // Step 4: Get new status of the vault
         VaultifyStructs.Status memory newStatus = vault.status();
-        assertEq(
-            newStatus.minted,
-            maxMintableWithFee + fee,
-            "Minted amount after borrowing maximum is not correct"
-        );
-
-        assertEq(
-            newStatus.maxMintable,
-            initialMaxMintableEuro,
-            "Max mintable amount is not correct after borrowing maximum"
-        );
-
-        assertEq(
-            newStatus.totalCollateralValue,
-            initialEuroCollateral,
-            "Total collateral value is not correct after borrowing maximum"
-        );
+        assertEq(newStatus.minted, initialMaxMintableEuro);
+        assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+        assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
 
         vm.stopPrank();
     }
@@ -221,7 +197,7 @@ contract SmartVaultTest is HelperTest {
         EUROs.approve(address(vault), burnAmount);
 
         vm.expectEmit(true, true, true, true);
-        emit VaultifyEvents.EUROsBurned(burnAmount, burnFee);
+        emit VaultifyEvents.EUROsBurned(burnAmount - burnFee, burnFee);
 
         vault.burnEuros(burnAmount);
 
@@ -249,76 +225,152 @@ contract SmartVaultTest is HelperTest {
         vm.stopPrank();
     }
 
-    // function test_BurnExactAmount() public {
-    //     console.log("Testing burning the exact amount of minted EUROs");
+    function test_BurnExactAmount() public {
+        console.log("Testing burning the exact amount of minted EUROs");
 
-    //     // Step 1: Mint a vault and transfer collateral
-    //     ISmartVault[] memory _vaults = new ISmartVault[](1);
-    //     (_vaults, alice) = createVaultOwners(1);
-    //     vault = _vaults[0];
+        // Step 1: Mint a vault and transfer collateral
+        ISmartVault[] memory _vaults = new ISmartVault[](1);
+        (_vaults, alice) = createVaultOwners(1);
+        vault = _vaults[0];
 
-    //     // Check if the MintFeeRate and burnFeeRate arenrt the same.
+        console.log("Alice balance before mint", EUROs.balanceOf(alice));
 
-    //     // Step 2: Mint some EUROs to have an initial balance
-    //     uint256 mintAmount = 50000 * 1e18;
-    //     vm.startPrank(alice);
-    //     vault.borrowMint(alice, mintAmount);
-    //     vm.stopPrank();
+        // Step 2: Mint some EUROs to have an initial balance
+        uint256 mintAmount = 50000 * 1e18;
+        vm.startPrank(alice);
+        vault.borrowMint(alice, mintAmount);
+        vm.stopPrank();
 
-    //     VaultifyStructs.Status memory afterMintStatus = vault.status();
-    //     console.log(
-    //         "Alice balance in EUROs after minting",
-    //         EUROs.balanceOf(alice)
-    //     );
-    //     console.log("Minted amount after minted", afterMintStatus.minted);
+        uint256 mintFee = (mintAmount * proxySmartVaultManager.mintFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
 
-    //     uint256 mintFee = (mintAmount * proxySmartVaultManager.mintFeeRate()) /
-    //         proxySmartVaultManager.HUNDRED_PRC();
+        uint256 burnAmount = mintAmount - mintFee;
+        console.log("Alice balance after mint", EUROs.balanceOf(alice));
 
-    //     // Step 3: Burn the exact amount of minted EUROs/
-    //     uint256 burnAmount = mintAmount - mintFee;
+        VaultifyStructs.Status memory initialStatus = vault.status();
+        console.log("Minted After borrowing", initialStatus.minted); // includes fees
 
-    //     console.log("burn Amount", burnAmount);
+        // Step 3: Burn the exact amount of minted EUROs
+        uint256 burnFee = (burnAmount * proxySmartVaultManager.burnFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
 
-    //     uint256 burnFee = (burnAmount * proxySmartVaultManager.burnFeeRate()) /
-    //         proxySmartVaultManager.HUNDRED_PRC();
+        vm.startPrank(alice);
+        EUROs.approve(address(vault), burnAmount);
 
-    //     vm.startPrank(alice);
-    //     EUROs.approve(address(vault), burnAmount);
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EUROsBurned(burnAmount - burnFee, burnFee);
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit VaultifyEvents.EUROsBurned(burnAmount, burnFee);
+        vault.burnEuros(burnAmount);
 
-    //     vault.burnEuros(burnAmount);
+        console.log("Alice balance after burn", EUROs.balanceOf(alice));
+        console.log("Alice Minted balnce to burn", burnAmount);
 
-    //     VaultifyStructs.Status memory afterburnStatus = vault.status();
-    //     console.log(
-    //         "Alice balance in EUROs after burning",
-    //         EUROs.balanceOf(alice)
-    //     );
-    //     console.log("Minted amount after burning", afterburnStatus.minted);
+        assertEq(
+            EUROs.balanceOf(alice),
+            0,
+            "Incorrect Alice balance after burning the "
+        );
+        assertEq(
+            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            burnFee + mintFee,
+            "Incorrect Liquidator balance after burning the exact amount of minted EUROs"
+        );
 
-    //     assertEq(
-    //         EUROs.balanceOf(alice),
-    //         0,
-    //         "Incorrect Alice balance after burning the "
-    //     );
-    //     assertEq(
-    //         EUROs.balanceOf(proxySmartVaultManager.liquidator()),
-    //         burnFee + mintFee,
-    //         "Incorrect Liquidator balance after burning the exact amount of minted EUROs"
-    //     );
+        // Step 5: Check if the minted state variable was deducted
+        VaultifyStructs.Status memory newStatus = vault.status();
 
-    //     // Step 5: Check if the minted state variable was deducted
-    //     VaultifyStructs.Status memory newStatus = vault.status();
+        console.log("newStatus", newStatus.minted / 1e18);
 
-    //     console.log("ExpectedMinted", newStatus.minted);
-    //     // assertEq(
-    //     //     newStatus.minted,
-    //     //     expectedMinted,
-    //     //     "Minted amount after burn is not correct"
-    //     // );
-    //     // console.log("minted amount", newStatus.minted / 1e18);
-    //     vm.stopPrank();
-    // }
+        assertEq(
+            newStatus.minted,
+            0,
+            "Minted/Borrowed state variable is not correct"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_BurnAndMintAgain() public {
+        console.log("Testing burn followed by another mint");
+
+        // Step 1: Mint a vault and transfer collateral
+        ISmartVault[] memory _vaults = new ISmartVault[](1);
+        (_vaults, alice) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        // Step 2: Mint some EUROs to have an initial balance
+        uint256 mintAmount = 20000 * 1e18;
+        uint256 mintFee = (mintAmount * proxySmartVaultManager.mintFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+
+        vm.startPrank(alice);
+
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EUROsMinted(alice, mintAmount - mintFee, mintFee);
+
+        vault.borrowMint(alice, mintAmount);
+
+        vm.stopPrank();
+
+        uint256 aliceMintedBalance = mintAmount - mintFee;
+
+        // Step 3: Burn some EUROs
+        uint256 burnAmount = 5000 * 1e18;
+        uint256 burnFee = (burnAmount * proxySmartVaultManager.burnFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+
+        // Approve the vault to spend Euros token on alice's behalf
+        vm.startPrank(alice);
+        EUROs.approve(address(vault), burnAmount);
+
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EUROsBurned(burnAmount - burnFee, burnFee);
+
+        vault.burnEuros(burnAmount);
+
+        // Step 4: Mint more EUROs
+        uint256 additionalMintAmount = 3000 * 1e18;
+        uint256 additionalMintFee = (additionalMintAmount *
+            proxySmartVaultManager.mintFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+
+        vault.borrowMint(alice, additionalMintAmount);
+
+        // aliceMintedBalance goes to alice wallet - burnAmount
+        //
+        // Step 5: Verify the balances
+        uint256 expectedAliceBalance = aliceMintedBalance -
+            burnAmount +
+            (additionalMintAmount - additionalMintFee);
+
+        console.log("Alice Balance", EUROs.balanceOf(alice));
+        console.log("ExecptedAlice balance", expectedAliceBalance);
+
+        assertEq(
+            EUROs.balanceOf(alice),
+            expectedAliceBalance,
+            "Alice balance after minting again is not correct"
+        );
+
+        uint256 expectedLiquidatorBalance = mintFee +
+            burnFee +
+            additionalMintFee;
+
+        assertEq(
+            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            expectedLiquidatorBalance,
+            "Liquidator balance after minting again is not correct"
+        );
+
+        // Step 6: Check if the minted state variable was updated correctly
+        VaultifyStructs.Status memory newStatus = vault.status();
+        uint256 expectedMinted = mintAmount - burnAmount + additionalMintAmount;
+        assertEq(
+            newStatus.minted,
+            expectedMinted,
+            "Minted/Borrowed state variable is not correct"
+        );
+
+        vm.stopPrank();
+    }
 }

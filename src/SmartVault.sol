@@ -307,11 +307,12 @@ contract SmartVault is ISmartVault {
         uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        if (!fullyCollateralised(_amount)) {
+        if (!fullyCollateralised(_amount + fee)) {
             revert VaultifyErrors.UnderCollateralisedVault(address(this));
         }
 
-        mintedEuros += _amount;
+        // Add both amount and fee to mintedEuros
+        mintedEuros += _amount + fee;
 
         EUROs.mint(_to, _amount - fee);
 
@@ -334,42 +335,25 @@ contract SmartVault is ISmartVault {
             address(this)
         ) >= _amount;
 
-        // we already give the the contract the allowance amount which deduct the fee from?
-        // Why do we give the contract an approval again throught delegate call to spend the fee as the fee is already part of the amount
-
         if (!euroApproved) revert VaultifyErrors.NotEnoughAllowance(_amount);
 
         uint256 fee = (_amount * smartVaultManager.burnFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
-        // 50_000 EUROS - Fee = Amount to brun therefore, burn can only
-        // with the amount that alice has of euros.
-        mintedEuros -= _amount;
-        // @audit-info if the user burns all his token to removecollateral
-        // will not be able to do so as mintedEuros will remain !0
-        // there fore I should look at a way to update minted Euros correctly
-        // use different approch to update rather than the current
+
+        // Subtract both amount and fee from minted
+        minted = minted - (_amount + fee);
 
         EUROs.burn(msg.sender, _amount - fee);
 
-        // Execute approve function in the context of the caller msg.sender to approve this contract
-        // to spend/transfer the fees to the liquidator
-        // (bool succ, ) = address(EUROs).delegatecall(
-        //     abi.encodeWithSignature(
-        //         "approve(address,uint256)",
-        //         address(this),
-        //         fee
-        //     )
-        // );
+        if (fee > 0) {
+            IERC20(address(EUROs)).safeTransferFrom(
+                msg.sender,
+                smartVaultManager.liquidator(),
+                fee
+            );
+        }
 
-        // if (!succ) revert VaultifyErrors.DelegateCallFailed();
-
-        IERC20(address(EUROs)).safeTransferFrom(
-            msg.sender,
-            smartVaultManager.liquidator(),
-            fee
-        );
-
-        emit VaultifyEvents.EUROsBurned(_amount, fee);
+        emit VaultifyEvents.EUROsBurned(_amount - fee, fee);
     }
 
     /**

@@ -90,7 +90,7 @@ abstract contract HelperTest is Test {
 
     uint256 public collateralRate = 110000; // 110%
     uint256 public mintFeeRate = 2000; // 2%;
-    uint256 public burnFeeRate = 3000; // 3%
+    uint256 public burnFeeRate = 2000; // 2%
     uint32 public poolFeePercentage = 50000; // 50%;
 
     bytes32 public native;

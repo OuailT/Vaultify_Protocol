@@ -8,6 +8,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 ////// Import Interfaces //////
+import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
+import {ISwapRouterMock} from "src/interfaces/ISwapRouterMock.sol";
 import {ISmartVaultManagerMock} from "src/mocks/ISmartVaultManagerMock.sol";
 import {ILiquidationPoolManager} from "src/interfaces/ILiquidationPoolManager.sol";
 import {ILiquidationPool} from "src/interfaces/ILiquidationPool.sol";
@@ -20,6 +22,7 @@ import {IEUROs} from "src/interfaces/IEUROs.sol";
 import {AggregatorV3InterfaceMock} from "src/mocks/AggregatorV3InterfaceMock.sol";
 
 ////// Import Mock Contracts //////
+import {SwapRouterMock} from "src/mocks/SwapRouterMock.sol";
 import {ERC20Mock} from "src/mocks/ERC20Mock.sol";
 import {IERC20Mock} from "src/mocks/IERC20Mock.sol";
 import {EUROsMock} from "src/mocks/EUROsMock.sol";
@@ -48,6 +51,7 @@ abstract contract HelperTest is Test {
 
     ITokenManager public tokenManagerContract;
     ISmartVaultIndex public smartVaultIndexContract;
+    ISwapRouter public swapRouterMockContract;
 
     /*********************** IMPLEMENTATION *****************************/
     address public smartVaultManagerImplementation; // Euros Admin as well
@@ -63,6 +67,8 @@ abstract contract HelperTest is Test {
     address public tokenManager;
     // address public smartVaultIndex;
     address public smartVaultDeployer;
+
+    address public swapRouterMock;
 
     // Assets Interfaces
     IEUROs public EUROs;
@@ -92,6 +98,7 @@ abstract contract HelperTest is Test {
     uint256 public mintFeeRate = 2000; // 2%;
     uint256 public burnFeeRate = 2000; // 2%
     uint32 public poolFeePercentage = 50000; // 50%;
+    uint256 public swapFeeRate = 1000; // 1%
 
     bytes32 public native;
 
@@ -151,6 +158,11 @@ abstract contract HelperTest is Test {
         );
 
         tokenManagerContract = ITokenManager(tokenManager);
+
+        // deploy SwapRouter Mock contract
+        swapRouterMock = address(new SwapRouterMock());
+
+        swapRouterMockContract = ISwapRouter(swapRouterMock);
 
         // deploy smartvaultdeployer.sol
         smartVaultDeployer = address(
@@ -219,6 +231,7 @@ abstract contract HelperTest is Test {
             _smartVaultIndex: address(proxySmartVaultIndex),
             _mintFeeRate: mintFeeRate,
             _burnFeeRate: burnFeeRate,
+            _swapFeeRate: swapFeeRate,
             _collateralRate: collateralRate,
             _protocol: protocol,
             _liquidator: liquidator,
@@ -250,6 +263,7 @@ abstract contract HelperTest is Test {
         proxySmartVaultManager.setLiquidatorAddress(
             address(proxyLiquidityPoolManager)
         );
+        proxySmartVaultManager.setSwapRouter2(swapRouterMock);
 
         proxySmartVaultIndex.setVaultManager(address(proxySmartVaultManager));
 
@@ -336,6 +350,8 @@ abstract contract HelperTest is Test {
             // mint/borrow Euros from the vault
             // Vault borrower can borrow up to // 69,188 EUR || 80%
             // vault.borrowMint(_vaultOwner, 50_350 * 1e18);
+            console.log("swap router address", address(swapRouterMock));
+            console.log("swap router address2 ", swapRouterMock);
 
             vm.stopPrank();
 

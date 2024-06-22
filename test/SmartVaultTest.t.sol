@@ -8,7 +8,6 @@ import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
 import "forge-std/console.sol";
 
 // TODOs  SLOW DOWN//
-// [] Remove add address from createNewVault
 
 contract SmartVaultTest is HelperTest {
     function setUp() public override {
@@ -372,5 +371,61 @@ contract SmartVaultTest is HelperTest {
         );
 
         vm.stopPrank();
+    }
+
+    // TODO: ADD TEST REVERT for BORROW MINT
+
+    /*********************************************************
+     **************************SWAP FUNCTION******************
+     *********************************************************/
+
+    function test_SwapTokensWithoutMinting() public {
+        console.log("Testing token swap without minting");
+
+        // Step 1: Mint a vault and transfer collateral
+        ISmartVault[] memory _vaults = new ISmartVault[](1);
+        (_vaults, alice) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        // Step 2: Swap WBTC to PAXG
+        uint256 swapAmount = 1 * 1e8; // 1 WBTC
+        uint256 swapFee = (swapAmount * proxySmartVaultManager.swapFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+
+        vm.startPrank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.ERC20SwapExecuted(swapAmount - swapFee, swapFee, 0);
+
+        vault.swap("WBTC", "PAXG", swapAmount);
+        vm.stopPrank();
+
+        // MockSwapData(
+        //     tokenIn,
+        //     tokenOut,
+        //     fee,
+        //     recipient,
+        //     deadline,
+        //     amountIn,
+        //     amountOutMinimum,
+        //     sqrtPriceLimitX96,
+        //     txValue
+        // );
+
+        // Verify the swap parameters
+        // (
+        //     address tokenIn,
+        //     address tokenOut,
+        //     uint24 fee,
+        //     address recipient,
+        //     uint256 deadline,
+        //     uint256 amountIn,
+        //     uint256 amountOutMinimum,
+        //     uint160 sqrtPriceLimitX96,
+        //     uint256 txValue
+        // ) = swapRouterMock.receivedSwap();
+
+        // assertEq(receivedParams.tokenIn, address(WBTC));
+        // assertEq(receivedParams.tokenOut, address(PAXG));
+        // assertEq(receivedParams.amountIn, swapAmount - swapFee);
     }
 }

@@ -68,6 +68,7 @@ contract SmartVaultManagerMock is
         address _smartVaultIndex,
         uint256 _mintFeeRate,
         uint256 _burnFeeRate,
+        uint256 _swapFeeRate,
         uint256 _collateralRate,
         address _protocol,
         address _liquidator,
@@ -80,6 +81,7 @@ contract SmartVaultManagerMock is
         __ERC721_init("The Standard Smart Vault Manager", "TSVAULTMAN");
         setMintFeeRate(_mintFeeRate);
         setBurnFeeRate(_burnFeeRate);
+        setSwapFeeRate(_swapFeeRate);
         setSmartVaultDeployer(_smartVaultDeployer);
         setProtocolAddress(_protocol);
         setLiquidatorAddress(_liquidator);

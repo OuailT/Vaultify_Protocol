@@ -25,6 +25,7 @@ interface ISmartVaultManagerMock {
         uint256,
         uint256,
         uint256,
+        uint256,
         address,
         address,
         address,

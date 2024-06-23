@@ -502,6 +502,7 @@ contract SmartVault is ISmartVault {
 
         // //@audit todo Check the difference between forceApprove and increaseallowance?
         // approve the router to spend amountin on the vault behalf to conduct the swap
+        // @audit check forceApprove vs approve
         IERC20(_params.tokenIn).forceApprove(
             smartVaultManager.swapRouter2(),
             _params.amountIn
@@ -539,14 +540,17 @@ contract SmartVault is ISmartVault {
         bytes32 _inTokenSymbol,
         bytes32 _outTokenSymbol,
         uint256 _amount,
-        uint256 _fee,
+        uint24 _fee,
         uint256 _minAmountOut
     ) external onlyVaultOwner {
         // Calculate the fee swap
         uint256 swapFee = (_amount * smartVaultManager.swapFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        if (_minAmountOut > _amount) revert Incorrect_MinAmountOut();
+        if (_minAmountOut > _amount)
+            revert VaultifyErrors.Incorrect_MinAmountOut(
+                "Minimum amount out cannot be greater than the input amount."
+            );
         // add fee ! 0 or within a range
         address inToken = getSwapAddressFor(_inTokenSymbol);
 

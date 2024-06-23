@@ -379,39 +379,43 @@ contract SmartVaultTest is HelperTest {
      **************************SWAP FUNCTION******************
      *********************************************************/
 
-    function test_SwapTokensWithoutMinting() public {
-        console.log("Testing token swap without minting");
+    function test_SwapPAXGtoWBTCWithoutMinting() public {
+        console.log(
+            "Testing swap from PAXG to WBTC without minting/borrwing EUROs"
+        );
 
         // Step 1: Mint a vault and transfer collateral
         ISmartVault[] memory _vaults = new ISmartVault[](1);
         (_vaults, alice) = createVaultOwners(1);
         vault = _vaults[0];
 
-        // Step 2: Swap WBTC to PAXG
-        uint256 swapAmount = 1 * 1e8; // 1 WBTC
+        // Step 2: Swap PAXG to WBTC
+        uint256 swapAmount = 10 * 1e18;
         uint256 swapFee = (swapAmount * proxySmartVaultManager.swapFeeRate()) /
             proxySmartVaultManager.HUNDRED_PRC();
+        uint256 minAmountOut = 9 * 1e8;
 
+        // Approve vault to spend PAXG tokens on alice's behalf
         vm.startPrank(alice);
-        // vm.expectEmit(true, true, true, true);
-        // emit VaultifyEvents.ERC20SwapExecuted(swapAmount - swapFee, swapFee, 0);
+        PAXG.approve(address(vault), swapAmount);
 
-        vault.swap("WBTC", "PAXG", swapAmount);
-        vm.stopPrank();
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.ERC20SwapExecuted(
+            swapAmount - swapFee,
+            swapFee,
+            minAmountOut
+        );
 
-        // MockSwapData(
-        //     tokenIn,
-        //     tokenOut,
-        //     fee,
-        //     recipient,
-        //     deadline,
-        //     amountIn,
-        //     amountOutMinimum,
-        //     sqrtPriceLimitX96,
-        //     txValue
-        // );
+        vault.swap(
+            bytes32(abi.encodePacked("PAXG")),
+            bytes32(abi.encodePacked("WBTC")),
+            swapAmount,
+            3000,
+            minAmountOut
+        );
 
-        // Verify the swap parameters
+        // Use mock data to verify swap execution and state variables
+        // @audit stopped here
         (
             address tokenIn,
             address tokenOut,
@@ -422,10 +426,22 @@ contract SmartVaultTest is HelperTest {
             uint256 amountOutMinimum,
             uint160 sqrtPriceLimitX96,
             uint256 txValue
-        ) = swapRouterMock.receivedSwap();
+        ) = swapRouterMockContract.receivedSwap();
+        // assertEq(swapData.tokenIn, address(WBTC), "TokenIn should be WBTC");
+        // assertEq(swapData.tokenOut, address(PAXG), "TokenOut should be PAXG");
+        // assertEq(
+        //     swapData.amountIn,
+        //     amountIn - swapFee,
+        //     "AmountIn should be correct"
+        // );
+        // assertEq(
+        //     swapData.amountOutMinimum,
+        //     minAmountOut,
+        //     "AmountOutMinimum should be correct"
+        // );
 
-        // assertEq(receivedParams.tokenIn, address(WBTC));
-        // assertEq(receivedParams.tokenOut, address(PAXG));
-        // assertEq(receivedParams.amountIn, swapAmount - swapFee);
+        console.log("Swap executed successfully without minting/borrowing");
+
+        vm.stopPrank();
     }
 }

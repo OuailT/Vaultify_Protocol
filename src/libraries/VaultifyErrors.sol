@@ -26,4 +26,5 @@ library VaultifyErrors {
     error NotEnoughEurosAllowance();
     error NotEnoughTstAllowance();
     error InvalidDecrementAmount();
+    error Incorrect_MinAmountOut(string message);
 }

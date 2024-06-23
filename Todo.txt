@@ -1,0 +1,3 @@
+[] compare the mock contracts with the origin contracts once the test is done
+[] off chaintest, then onchain test 
+[] add to src: tokenManager.sol, deployer.sol, smartContractIndex.sol, etc

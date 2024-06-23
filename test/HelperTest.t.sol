@@ -9,7 +9,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 
 ////// Import Interfaces //////
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
-import {ISwapRouterMock} from "src/interfaces/ISwapRouterMock.sol";
 import {ISmartVaultManagerMock} from "src/mocks/ISmartVaultManagerMock.sol";
 import {ILiquidationPoolManager} from "src/interfaces/ILiquidationPoolManager.sol";
 import {ILiquidationPool} from "src/interfaces/ILiquidationPool.sol";
@@ -350,8 +349,6 @@ abstract contract HelperTest is Test {
             // mint/borrow Euros from the vault
             // Vault borrower can borrow up to // 69,188 EUR || 80%
             // vault.borrowMint(_vaultOwner, 50_350 * 1e18);
-            console.log("swap router address", address(swapRouterMock));
-            console.log("swap router address2 ", swapRouterMock);
 
             vm.stopPrank();
 

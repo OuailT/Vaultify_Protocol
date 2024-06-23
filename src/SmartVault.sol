@@ -109,12 +109,14 @@ contract SmartVault is ISmartVault {
      * @param _inTokenSymbol The symbol of the input token.
      * @param _outTokenSymbol The symbol of the output token.
      * @param _amount The amount of the input token.
+     * @param _minAmountOut The minimum amount of the output token expected by the user.
      * @return The minimum amount of the output token required.
      */
     function calculateMinimimAmountOut(
         bytes32 _inTokenSymbol,
         bytes32 _outTokenSymbol,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _minAmountOut
     ) private view returns (uint256) {
         // The percentage of minted token(borrowed token) that must be backed by collateral
         // to keep vault collatalized
@@ -131,7 +133,7 @@ contract SmartVault is ISmartVault {
         // else: The Vault/contract must receive from the swap at least a minimumOut to keep vault collateralized.
         return
             collateralValueMinusSwapValue >= requiredCollateralValue
-                ? 0
+                ? _minAmountOut
                 : calculator.euroToToken(
                     getToken(_outTokenSymbol),
                     requiredCollateralValue - collateralValueMinusSwapValue
@@ -509,12 +511,12 @@ contract SmartVault is ISmartVault {
         amountOut = ISwapRouter(smartVaultManager.swapRouter2())
             .exactInputSingle(_params);
 
-        // If user Swap AToken/WETH then we convert WETH to ETH
-        IWETH weth = IWETH(smartVaultManager.weth());
+        // // If user Swap AToken/WETH then we convert WETH to ETH
+        // IWETH weth = IWETH(smartVaultManager.weth());
 
-        // Convert potentially received weth to ETH
-        uint256 wethBalance = weth.balanceOf(address(this));
-        if (wethBalance > 0) weth.withdraw(wethBalance);
+        // // Convert potentially received weth to ETH
+        // uint256 wethBalance = weth.balanceOf(address(this));
+        // if (wethBalance > 0) weth.withdraw(wethBalance);
 
         emit VaultifyEvents.ERC20SwapExecuted(
             _params.amountIn,
@@ -522,35 +524,44 @@ contract SmartVault is ISmartVault {
             amountOut
         );
     }
-
+    // amountOutMinimum is used to specify the minimum amount of tokens
+    // the caller wants to be returned from a swap
     /**
      * @notice Swaps a specified amount of one token for another.
      * @param _inTokenSymbol The symbol of the input token.
      * @param _outTokenSymbol The symbol of the output token.
      * @param _amount The amount of the input token to swap.
+     * @param _minAmountOut The minimum amount out expected from the swap.
      */
+    // TODO: Add dynamic price in the excuteSingle function in SwapRouterMock using the calculator
+    // to mock a swap.
     function swap(
         bytes32 _inTokenSymbol,
         bytes32 _outTokenSymbol,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _fee,
+        uint256 _minAmountOut
     ) external onlyVaultOwner {
         // Calculate the fee swap
         uint256 swapFee = (_amount * smartVaultManager.swapFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
+        if (_minAmountOut > _amount) revert Incorrect_MinAmountOut();
+        // add fee ! 0 or within a range
         address inToken = getSwapAddressFor(_inTokenSymbol);
 
         uint256 minimumAmountOut = calculateMinimimAmountOut(
             _inTokenSymbol,
             _outTokenSymbol,
-            _amount
+            _amount,
+            _minAmountOut
         );
 
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: inToken,
                 tokenOut: getSwapAddressFor(_outTokenSymbol),
-                fee: 3000,
+                fee: _fee,
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: _amount - swapFee,
@@ -558,9 +569,11 @@ contract SmartVault is ISmartVault {
                 sqrtPriceLimitX96: 0
             });
 
-        inToken == smartVaultManager.weth()
-            ? executeNativeSwapAndFee(params, swapFee)
-            : executeERC20SwapAndFee(params, swapFee);
+        executeERC20SwapAndFee(params, swapFee);
+
+        // inToken == smartVaultManager.weth()
+        //     ? executeNativeSwapAndFee(params, swapFee)
+        //     : executeERC20SwapAndFee(params, swapFee);
     }
 
     /**

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "src/interfaces/ISwapRouter.sol";
+import "src/interfaces/ISwapRouterMock.sol";
 
 contract SwapRouterMock is ISwapRouter {
     address private tokenIn;
@@ -13,20 +14,6 @@ contract SwapRouterMock is ISwapRouter {
     uint256 private amountOutMinimum;
     uint160 private sqrtPriceLimitX96;
     uint256 private txValue;
-
-    struct MockSwapData {
-        address tokenIn;
-        address tokenOut;
-        uint24 fee;
-        address recipient;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-        uint160 sqrtPriceLimitX96;
-        uint256 txValue;
-    }
-
-    constructor() {}
 
     function exactInputSingle(
         ExactInputSingleParams calldata params

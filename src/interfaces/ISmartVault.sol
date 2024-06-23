@@ -18,7 +18,9 @@ interface ISmartVault {
     function swap(
         bytes32 _inTokenSybmol,
         bytes32 _outTokenSymbol,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _fee,
+        _minAmountOut
     ) external;
     function removeNativeCollateral(
         uint256 _amount,

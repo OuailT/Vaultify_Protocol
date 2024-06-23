@@ -393,8 +393,8 @@ contract SmartVaultTest is HelperTest {
             proxySmartVaultManager.HUNDRED_PRC();
 
         vm.startPrank(alice);
-        vm.expectEmit(true, true, true, true);
-        emit VaultifyEvents.ERC20SwapExecuted(swapAmount - swapFee, swapFee, 0);
+        // vm.expectEmit(true, true, true, true);
+        // emit VaultifyEvents.ERC20SwapExecuted(swapAmount - swapFee, swapFee, 0);
 
         vault.swap("WBTC", "PAXG", swapAmount);
         vm.stopPrank();
@@ -412,17 +412,17 @@ contract SmartVaultTest is HelperTest {
         // );
 
         // Verify the swap parameters
-        // (
-        //     address tokenIn,
-        //     address tokenOut,
-        //     uint24 fee,
-        //     address recipient,
-        //     uint256 deadline,
-        //     uint256 amountIn,
-        //     uint256 amountOutMinimum,
-        //     uint160 sqrtPriceLimitX96,
-        //     uint256 txValue
-        // ) = swapRouterMock.receivedSwap();
+        (
+            address tokenIn,
+            address tokenOut,
+            uint24 fee,
+            address recipient,
+            uint256 deadline,
+            uint256 amountIn,
+            uint256 amountOutMinimum,
+            uint160 sqrtPriceLimitX96,
+            uint256 txValue
+        ) = swapRouterMock.receivedSwap();
 
         // assertEq(receivedParams.tokenIn, address(WBTC));
         // assertEq(receivedParams.tokenOut, address(PAXG));

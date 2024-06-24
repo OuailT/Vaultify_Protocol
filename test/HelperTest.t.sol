@@ -19,6 +19,7 @@ import {ISmartVaultDeployer} from "src/interfaces/ISmartVaultDeployer.sol";
 import {ISmartVaultIndex} from "src/interfaces/ISmartVaultIndex.sol";
 import {IEUROs} from "src/interfaces/IEUROs.sol";
 import {AggregatorV3InterfaceMock} from "src/mocks/AggregatorV3InterfaceMock.sol";
+import {WETH} from "solmate/src/tokens/WETH.sol";
 
 ////// Import Mock Contracts //////
 import {SwapRouterMock} from "src/mocks/SwapRouterMock.sol";
@@ -71,6 +72,7 @@ abstract contract HelperTest is Test {
 
     // Assets Interfaces
     IEUROs public EUROs;
+    address public weth;
     IERC20Mock public TST; // Standard protocol
     IERC20Mock public WBTC;
     IERC20Mock public PAXG; // tokenized gold
@@ -135,6 +137,8 @@ abstract contract HelperTest is Test {
         TST = IERC20Mock(tst);
         WBTC = IERC20Mock(wbtc);
         PAXG = IERC20Mock(paxg);
+
+        weth = address(new WETH());
 
         // Deploy the proxy admin for all system contract
         proxyAdmin = new ProxyAdmin(address(admin));
@@ -236,7 +240,8 @@ abstract contract HelperTest is Test {
             _liquidator: liquidator,
             _tokenManager: tokenManager,
             _smartVaultDeployer: smartVaultDeployer,
-            _euros: euros
+            _euros: euros,
+            _weth: weth
         });
 
         proxyLiquidityPoolManager.initialize({
@@ -343,6 +348,11 @@ abstract contract HelperTest is Test {
             PAXG.transfer(vaultAddr, 10 * 1e18);
             // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
 
+            // ISwapRouter.MockSwapData memory swapData = SwapRouterMock(
+            //     proxySmartVaultManager.swapRouter2()
+            // ).receivedSwap();
+
+            // assertEq(swapData.tokenIn, address(WBTC), "TokenIn should be WBTC");
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188
 

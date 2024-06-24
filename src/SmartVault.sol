@@ -512,12 +512,12 @@ contract SmartVault is ISmartVault {
         amountOut = ISwapRouter(smartVaultManager.swapRouter2())
             .exactInputSingle(_params);
 
-        // // If user Swap AToken/WETH then we convert WETH to ETH
-        // IWETH weth = IWETH(smartVaultManager.weth());
+        // If user Swap AToken/WETH then we convert WETH to ETH
+        IWETH weth = IWETH(smartVaultManager.weth());
 
-        // // Convert potentially received weth to ETH
-        // uint256 wethBalance = weth.balanceOf(address(this));
-        // if (wethBalance > 0) weth.withdraw(wethBalance);
+        // Convert potentially received weth to ETH
+        uint256 wethBalance = weth.balanceOf(address(this));
+        if (wethBalance > 0) weth.withdraw(wethBalance);
 
         emit VaultifyEvents.ERC20SwapExecuted(
             _params.amountIn,
@@ -567,17 +567,15 @@ contract SmartVault is ISmartVault {
                 tokenOut: getSwapAddressFor(_outTokenSymbol),
                 fee: _fee,
                 recipient: address(this),
-                deadline: block.timestamp,
+                deadline: block.timestamp + 60, // 1 minute from now
                 amountIn: _amount - swapFee,
                 amountOutMinimum: minimumAmountOut,
                 sqrtPriceLimitX96: 0
             });
 
-        executeERC20SwapAndFee(params, swapFee);
-
-        // inToken == smartVaultManager.weth()
-        //     ? executeNativeSwapAndFee(params, swapFee)
-        //     : executeERC20SwapAndFee(params, swapFee);
+        inToken == smartVaultManager.weth()
+            ? executeNativeSwapAndFee(params, swapFee)
+            : executeERC20SwapAndFee(params, swapFee);
     }
 
     /**

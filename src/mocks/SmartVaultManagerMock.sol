@@ -74,7 +74,8 @@ contract SmartVaultManagerMock is
         address _liquidator,
         address _tokenManager,
         address _smartVaultDeployer,
-        address _euros
+        address _euros,
+        address _weth
     ) external initializer {
         __Ownable_init(_msgSender());
         __Context_init();
@@ -85,6 +86,7 @@ contract SmartVaultManagerMock is
         setSmartVaultDeployer(_smartVaultDeployer);
         setProtocolAddress(_protocol);
         setLiquidatorAddress(_liquidator);
+        setWethAddress(address(_weth));
         smartVaultIndexContract = ISmartVaultIndex(_smartVaultIndex);
         euros = _euros;
         tokenManager = _tokenManager;

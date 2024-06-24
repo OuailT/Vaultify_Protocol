@@ -30,6 +30,7 @@ interface ISmartVaultManagerMock {
         address,
         address,
         address,
+        address,
         address
     ) external;
 

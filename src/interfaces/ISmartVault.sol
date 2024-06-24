@@ -19,9 +19,10 @@ interface ISmartVault {
         bytes32 _inTokenSybmol,
         bytes32 _outTokenSymbol,
         uint256 _amount,
-        uint256 _fee,
+        uint24 _fee,
         uint256 _minAmountOut
     ) external;
+
     function removeNativeCollateral(
         uint256 _amount,
         address payable _to

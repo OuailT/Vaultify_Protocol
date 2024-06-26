@@ -8,12 +8,15 @@ interface ISmartVault {
         bytes32 _symbol,
         address addr
     ) external view returns (uint256);
-    function status() external view returns (VaultifyStructs.Status memory);
+    function vaultStatus()
+        external
+        view
+        returns (VaultifyStructs.VaultStatus memory);
     function underCollateralised() external view returns (bool);
     function setOwner(address _newOwner) external;
     function liquidate() external;
-    function borrowMint(address _to, uint256 _amount) external;
-    function burnEuros(uint256 _amount) external;
+    function borrow(address _to, uint256 _amount) external;
+    function repay(uint256 _amount) external;
     function getTokenManager() external view returns (ITokenManager);
     function swap(
         bytes32 _inTokenSybmol,

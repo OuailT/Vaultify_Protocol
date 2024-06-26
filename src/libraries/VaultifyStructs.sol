@@ -25,13 +25,13 @@ library VaultifyStructs {
     }
 
     // The Status of the smart vault
-    struct Status {
+    struct VaultStatus {
         address vaultAddress;
-        uint256 minted;
-        uint256 maxMintable;
+        uint256 borrowedAmount;
+        uint256 maxBorrowableEuros;
         uint256 totalCollateralValue;
-        SmartVaultAssets[] collateral;
-        bool liquidated;
+        SmartVaultAssets[] collateralAssets;
+        bool isLiquidated;
         uint8 version;
         bytes32 vaultType;
     }
@@ -42,6 +42,6 @@ library VaultifyStructs {
         uint256 collateralRate;
         uint256 mintFeeRate;
         uint256 burnFeeRate;
-        Status status;
+        VaultStatus status;
     }
 }

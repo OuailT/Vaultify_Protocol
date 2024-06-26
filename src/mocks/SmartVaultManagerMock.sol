@@ -148,7 +148,7 @@ contract SmartVaultManagerMock is
                 burnFeeRate: burnFeeRate,
                 status: ISmartVault(
                     smartVaultIndexContract.getVaultAddress(tokenId)
-                ).status()
+                ).vaultStatus()
             });
         }
 
@@ -158,9 +158,9 @@ contract SmartVaultManagerMock is
     function tokenURI(
         uint256 _tokenId
     ) public view virtual override returns (string memory) {
-        VaultifyStructs.Status memory vaultStatus = ISmartVault(
+        VaultifyStructs.VaultStatus memory vaultStatus = ISmartVault(
             smartVaultIndexContract.getVaultAddress(_tokenId)
-        ).status();
+        ).vaultStatus();
         return
             // Generate metadata based on the vault status and tokenId
             INFTMetadataGenerator(nftMetadataGenerator).generateNFTMetadata(

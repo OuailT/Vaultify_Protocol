@@ -13,9 +13,9 @@ interface ISmartVaultMock {
 
     function owner() external view returns (address);
 
-    function status(
+    function vaultStatus(
         address _vaultAddr
-    ) external view returns (VaultifyStructs.Status memory);
+    ) external view returns (VaultifyStructs.VaultStatus memory);
 
     function getAssets(
         address _vaultAddr
@@ -36,13 +36,9 @@ interface ISmartVaultMock {
 
     function liquidate(address _vaultAddr) external;
 
-    function borrowMint(
-        address _to,
-        uint256 _amount,
-        address _vaultAddr
-    ) external;
+    function borrow(address _to, uint256 _amount, address _vaultAddr) external;
 
-    function burnEuros(uint256 _amount) external;
+    function repay(uint256 _amount) external;
 
     function swap(
         address _vaultAddr,

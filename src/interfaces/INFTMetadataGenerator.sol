@@ -6,6 +6,6 @@ import {VaultifyStructs} from "../libraries/VaultifyStructs.sol";
 interface INFTMetadataGenerator {
     function generateNFTMetadata(
         uint256 _tokenId,
-        VaultifyStructs.Status memory _vaultStatus
+        VaultifyStructs.VaultStatus memory _vaultStatus
     ) external view returns (string memory);
 }

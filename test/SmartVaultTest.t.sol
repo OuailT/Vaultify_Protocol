@@ -26,20 +26,20 @@ contract SmartVaultTest is HelperTest {
         vault = _vaults[0];
 
         // Step 2: Get initial status of the vault
-        VaultifyStructs.Status memory initialStatus = vault.status();
+        VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
 
-        uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+        uint256 initialMaxMintableEuro = initialStatus.maxBorrowableEuros;
         uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
 
         vm.startPrank(alice);
 
         // Step 3: Mint the maximum allowable euros
-        vault.borrowMint(alice, initialMaxMintableEuro);
+        vault.borrow(alice, initialMaxMintableEuro);
 
         // Step 4: Get new status of the vault
-        VaultifyStructs.Status memory newStatus = vault.status();
-        assertEq(newStatus.minted, initialMaxMintableEuro);
-        assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
+        assertEq(newStatus.borrowedAmount, initialMaxMintableEuro);
+        assertEq(newStatus.maxBorrowableEuros, initialMaxMintableEuro);
         assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
 
         vm.stopPrank();
@@ -55,8 +55,8 @@ contract SmartVaultTest is HelperTest {
         vault = _vaults[0];
 
         // Step 2: Get initial status of the vault
-        VaultifyStructs.Status memory initialStatus = vault.status();
-        uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+        VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
+        uint256 initialMaxMintableEuro = initialStatus.maxBorrowableEuros;
         uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
 
         vm.startPrank(alice);
@@ -64,12 +64,12 @@ contract SmartVaultTest is HelperTest {
         // Step 3: Mint a specific amount
         uint256 mintAmount = 55000 * 1e18; // Example mint amount
 
-        vault.borrowMint(alice, mintAmount);
+        vault.borrow(alice, mintAmount);
 
         // Step 4: Get new status of the vault
-        VaultifyStructs.Status memory newStatus = vault.status();
-        assertEq(newStatus.minted, mintAmount);
-        assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
+        assertEq(newStatus.borrowedAmount, mintAmount);
+        assertEq(newStatus.maxBorrowableEuros, initialMaxMintableEuro);
         assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
 
         vm.stopPrank();
@@ -85,8 +85,8 @@ contract SmartVaultTest is HelperTest {
         vault = _vaults[0];
 
         // Step 2: Get initial status of the vault
-        VaultifyStructs.Status memory initialStatus = vault.status();
-        uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+        VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
+        uint256 initialMaxMintableEuro = initialStatus.maxBorrowableEuros;
         uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
 
         vm.startPrank(alice);
@@ -100,11 +100,11 @@ contract SmartVaultTest is HelperTest {
         emit VaultifyEvents.EUROsMinted(alice, mintAmount - fee, fee);
 
         console.log("Fee on the 50_000 EUROS", fee);
-        vault.borrowMint(address(alice), mintAmount);
+        vault.borrow(address(alice), mintAmount);
 
         // Step 4: Get new status of the vault
-        VaultifyStructs.Status memory newStatus = vault.status();
-        assertEq(newStatus.minted, mintAmount);
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
+        assertEq(newStatus.borrowedAmount, mintAmount);
 
         console.log(
             "Alice Balance after mint",
@@ -117,7 +117,7 @@ contract SmartVaultTest is HelperTest {
             "Fee aren't deducted"
         );
         assertEq(EUROs.balanceOf(proxySmartVaultManager.liquidator()), fee);
-        assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+        assertEq(newStatus.maxBorrowableEuros, initialMaxMintableEuro);
         assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
 
         vm.stopPrank();
@@ -132,8 +132,8 @@ contract SmartVaultTest is HelperTest {
         vault = _vaults[0];
 
         // Step 2: Get initial status of the vault
-        VaultifyStructs.Status memory initialStatus = vault.status();
-        uint256 initialMaxMintableEuro = initialStatus.maxMintable;
+        VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
+        uint256 initialMaxMintableEuro = initialStatus.maxBorrowableEuros;
         uint256 initialEuroCollateral = initialStatus.totalCollateralValue;
 
         vm.startPrank(alice);
@@ -148,19 +148,19 @@ contract SmartVaultTest is HelperTest {
         uint totalFee = (totalMinted * proxySmartVaultManager.mintFeeRate()) /
             proxySmartVaultManager.HUNDRED_PRC();
 
-        vault.borrowMint(alice, mintAmount1);
-        vault.borrowMint(alice, mintAmount2);
-        vault.borrowMint(alice, mintAmount3);
+        vault.borrow(alice, mintAmount1);
+        vault.borrow(alice, mintAmount2);
+        vault.borrow(alice, mintAmount3);
 
         // Step 4: Get new status of the vault
-        VaultifyStructs.Status memory newStatus = vault.status();
-        assertEq(newStatus.minted, totalMinted);
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
+        assertEq(newStatus.borrowedAmount, totalMinted);
         assertEq(EUROs.balanceOf(alice), totalMinted - totalFee);
         assertEq(
             EUROs.balanceOf(proxySmartVaultManager.liquidator()),
             totalFee
         );
-        assertEq(newStatus.maxMintable, initialMaxMintableEuro);
+        assertEq(newStatus.maxBorrowableEuros, initialMaxMintableEuro);
         assertEq(newStatus.totalCollateralValue, initialEuroCollateral);
 
         vm.stopPrank();
@@ -182,7 +182,7 @@ contract SmartVaultTest is HelperTest {
             proxySmartVaultManager.HUNDRED_PRC();
 
         vm.startPrank(alice);
-        vault.borrowMint(alice, mintAmount);
+        vault.borrow(alice, mintAmount);
         vm.stopPrank();
 
         uint256 aliceMintedBalance = mintAmount - mintFee;
@@ -199,7 +199,7 @@ contract SmartVaultTest is HelperTest {
         vm.expectEmit(true, true, true, true);
         emit VaultifyEvents.EUROsBurned(burnAmount - burnFee, burnFee);
 
-        vault.burnEuros(burnAmount);
+        vault.repay(burnAmount);
 
         // Step 4: Verify the balances
         assertEq(
@@ -215,9 +215,9 @@ contract SmartVaultTest is HelperTest {
         );
 
         // Step 5: Check if the minted state variable was deducted
-        VaultifyStructs.Status memory newStatus = vault.status();
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
         assertEq(
-            newStatus.minted,
+            newStatus.borrowedAmount,
             mintAmount - burnAmount,
             "Minted/Borrowed state variable is not correct"
         );
@@ -238,7 +238,7 @@ contract SmartVaultTest is HelperTest {
         // Step 2: Mint some EUROs to have an initial balance
         uint256 mintAmount = 50000 * 1e18;
         vm.startPrank(alice);
-        vault.borrowMint(alice, mintAmount);
+        vault.borrow(alice, mintAmount);
         vm.stopPrank();
 
         uint256 mintFee = (mintAmount * proxySmartVaultManager.mintFeeRate()) /
@@ -247,8 +247,8 @@ contract SmartVaultTest is HelperTest {
         uint256 burnAmount = mintAmount - mintFee;
         console.log("Alice balance after mint", EUROs.balanceOf(alice));
 
-        VaultifyStructs.Status memory initialStatus = vault.status();
-        console.log("Minted After borrowing", initialStatus.minted); // includes fees
+        VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
+        console.log("Minted After borrowing", initialStatus.borrowedAmount); // includes fees
 
         // Step 3: Burn the exact amount of minted EUROs
         uint256 burnFee = (burnAmount * proxySmartVaultManager.burnFeeRate()) /
@@ -260,7 +260,7 @@ contract SmartVaultTest is HelperTest {
         vm.expectEmit(true, true, true, true);
         emit VaultifyEvents.EUROsBurned(burnAmount - burnFee, burnFee);
 
-        vault.burnEuros(burnAmount);
+        vault.repay(burnAmount);
 
         console.log("Alice balance after burn", EUROs.balanceOf(alice));
         console.log("Alice Minted balnce to burn", burnAmount);
@@ -277,12 +277,12 @@ contract SmartVaultTest is HelperTest {
         );
 
         // Step 5: Check if the minted state variable was deducted
-        VaultifyStructs.Status memory newStatus = vault.status();
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
 
-        console.log("newStatus", newStatus.minted / 1e18);
+        console.log("newStatus", newStatus.borrowedAmount / 1e18);
 
         assertEq(
-            newStatus.minted,
+            newStatus.borrowedAmount,
             0,
             "Minted/Borrowed state variable is not correct"
         );
@@ -308,7 +308,7 @@ contract SmartVaultTest is HelperTest {
         vm.expectEmit(true, true, true, true);
         emit VaultifyEvents.EUROsMinted(alice, mintAmount - mintFee, mintFee);
 
-        vault.borrowMint(alice, mintAmount);
+        vault.borrow(alice, mintAmount);
 
         vm.stopPrank();
 
@@ -326,7 +326,7 @@ contract SmartVaultTest is HelperTest {
         vm.expectEmit(true, true, true, true);
         emit VaultifyEvents.EUROsBurned(burnAmount - burnFee, burnFee);
 
-        vault.burnEuros(burnAmount);
+        vault.repay(burnAmount);
 
         // Step 4: Mint more EUROs
         uint256 additionalMintAmount = 3000 * 1e18;
@@ -334,7 +334,7 @@ contract SmartVaultTest is HelperTest {
             proxySmartVaultManager.mintFeeRate()) /
             proxySmartVaultManager.HUNDRED_PRC();
 
-        vault.borrowMint(alice, additionalMintAmount);
+        vault.borrow(alice, additionalMintAmount);
 
         // aliceMintedBalance goes to alice wallet - burnAmount
         //
@@ -363,10 +363,10 @@ contract SmartVaultTest is HelperTest {
         );
 
         // Step 6: Check if the minted state variable was updated correctly
-        VaultifyStructs.Status memory newStatus = vault.status();
+        VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
         uint256 expectedMinted = mintAmount - burnAmount + additionalMintAmount;
         assertEq(
-            newStatus.minted,
+            newStatus.borrowedAmount,
             expectedMinted,
             "Minted/Borrowed state variable is not correct"
         );
@@ -441,7 +441,7 @@ contract SmartVaultTest is HelperTest {
         // Step 2: Mint/Borrow some EUROs to have an initial balance
         uint256 mintAmount = 50000 * 1e18;
         vm.startPrank(alice);
-        vault.borrowMint(alice, mintAmount);
+        vault.borrow(alice, mintAmount);
         vm.stopPrank();
 
         // Step 3: Burn some EUROs
@@ -451,7 +451,7 @@ contract SmartVaultTest is HelperTest {
 
         vm.startPrank(alice);
         EUROs.approve(address(vault), burnAmount);
-        vault.burnEuros(burnAmount);
+        vault.repay(burnAmount);
         vm.stopPrank();
 
         // Step 5: Execute a swap
@@ -493,150 +493,92 @@ contract SmartVaultTest is HelperTest {
         );
     }
 
-    function test_SwapETHToWBTC() public {
-        console.log("Testing swap from ETH to WBTC");
+    function test_BasicEthToWbtcSwap() public {
+        console.log("Testing basic ETH to WBTC swap");
 
-        // Step 1: Mint a vault and transfer collateral
-        ISmartVault[] memory _vaults = new ISmartVault[](1);
-        (_vaults, alice) = createVaultOwners(1);
-        vault = _vaults[0];
-
-        // Step 3: Execute a swap
-        uint256 amountIn = 10 * 1e18; // 10 ETH
-        uint256 swapFee = (amountIn * proxySmartVaultManager.swapFeeRate()) /
-            proxySmartVaultManager.HUNDRED_PRC();
-        uint256 minAmountOut = 0.1 * 1e8; // Mock value for minimum amount out
-        uint24 poolFee = 500; // 0.5% pool fee in basis point
-
-        vm.startPrank(alice);
-        vault.swap(
-            bytes32(abi.encodePacked("ETH")),
-            bytes32(abi.encodePacked("WBTC")),
-            amountIn,
-            poolFee,
-            minAmountOut
-        );
-        vm.stopPrank();
-
-        // Step 4: Verify the balances and state
-        // Use mock data to verify swap execution and state variables
-        ISwapRouter.MockSwapData memory swapData = swapRouterMockContract
-            .receivedSwap();
-        assertEq(
-            swapData.tokenIn,
-            proxySmartVaultManager.weth(),
-            "TokenIn should be WETH"
-        );
-        assertEq(swapData.tokenOut, address(WBTC), "TokenOut should be WBTC");
-        assertEq(
-            swapData.amountIn,
-            amountIn - swapFee,
-            "AmountIn should be correct"
-        );
-        assertEq(
-            swapData.amountOutMinimum,
-            minAmountOut,
-            "AmountOutMinimum should be correct"
-        );
-
-        assertEq((proxySmartVaultManager.liquidator()).balance, swapFee);
-
-        console.log("Swap executed successfully from ETH to WBTC");
-    }
-
-    function test_SwapExactCollateralizationLimit() public {
-        console.log("Testing swap at exact collateralization limit");
-
-        // create a vault
+        // Setup
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
+        // Add collateral
         vm.startPrank(_owner);
-        // Get initial status
-        VaultifyStructs.Status memory initialStatus = vault.status();
-        uint256 maxMintable = initialStatus.maxMintable;
-
-        // Borrow close to the maximum allowed (95% of max mintable)
-        uint256 borrowAmount = (maxMintable * 95) / 100;
-        vault.borrowMint(_owner, borrowAmount);
+        (bool sent, ) = address(vault).call{value: 1 ether}("");
+        require(sent, "Failed to send Ether");
 
         // Prepare swap parameters
         bytes32 inToken = bytes32("ETH");
         bytes32 outToken = bytes32("WBTC");
-        uint256 swapAmount = 0.5 ether; // Swap half of the ETH
-        uint256 minAmountOut = 0.025 * 1e8; // User expects at least 0.025 WBTC
+        uint256 swapAmount = 0.1 ether;
+        uint256 minAmountOut = 0.005 * 1e8; // Expect at least 0.005 WBTC
         uint24 poolFee = 3000; // 0.3% pool fee
-
-        // Get pre-swap status
-        VaultifyStructs.Status memory preSwapStatus = vault.status();
-        uint256 preSwapCollateral = preSwapStatus.totalCollateralValue;
-
-        console.log("pre swap Collateral", preSwapCollateral);
 
         // Execute swap
         vault.swap(inToken, outToken, swapAmount, poolFee, minAmountOut);
 
-        // Get post-swap status
-        VaultifyStructs.Status memory postSwapStatus = vault.status();
-        console.log(
-            "post swap Collateral",
-            postSwapStatus.totalCollateralValue
+        // Verify MockSwapData
+        ISwapRouter.MockSwapData memory swapData = swapRouterMockContract
+            .receivedSwap();
+        assertEq(
+            swapData.tokenIn,
+            address(proxySmartVaultManager.weth()),
+            "Incorrect tokenIn"
         );
+        assertEq(swapData.tokenOut, address(WBTC), "Incorrect tokenOut");
+        assertEq(swapData.fee, poolFee, "Incorrect pool fee");
+        assertEq(swapData.recipient, address(vault), "Incorrect recipient");
 
-        console.log(
-            "required collateral Value the vault must have",
-            (postSwapStatus.minted * proxySmartVaultManager.collateralRate()) /
-                proxySmartVaultManager.HUNDRED_PRC()
-        );
-
-        // Verify
-        // 1. The vault should remain collateralized
+        uint256 swapFee = (swapAmount * proxySmartVaultManager.swapFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+        assertEq(swapData.amountIn, swapAmount - swapFee, "Incorrect amountIn");
         assertGe(
-            postSwapStatus.totalCollateralValue,
-            (postSwapStatus.minted * proxySmartVaultManager.collateralRate()) /
-                proxySmartVaultManager.HUNDRED_PRC(),
-            "Vault should remain at or above collateralization limit"
+            swapData.amountOutMinimum,
+            minAmountOut,
+            "Incorrect amountOutMinimum"
         );
 
-        // // 2. The total collateral value shouldn't decrease significantly (allow for a small slippage, e.g., 1%)
-        // assertGe(
-        //     postSwapStatus.totalCollateralValue,
-        //     (preSwapCollateral * 99) / 100,
-        //     "Collateral should not decrease significantly due to swap"
-        // );
+        vm.stopPrank();
+    }
 
-        // // 3. Check SwapRouterMock data
-        // ISwapRouter.MockSwapData memory swapData = SwapRouterMock(
-        //     address(swapRouterMockContract)
-        // ).receivedSwap();
-        // assertEq(
-        //     swapData.tokenIn,
-        //     address(proxySmartVaultManager.weth()),
-        //     "Incorrect tokenIn"
-        // );
-        // assertEq(swapData.tokenOut, address(WBTC), "Incorrect tokenOut");
+    function test_BasicWbtcToEthSwap() public {
+        console.log("Testing basic WBTC to ETH swap");
 
-        // uint256 swapFee = (swapAmount * proxySmartVaultManager.swapFeeRate()) /
-        //     proxySmartVaultManager.HUNDRED_PRC();
-        // assertEq(swapData.amountIn, swapAmount - swapFee, "Incorrect amountIn");
+        // Setup
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
 
-        // // 4. Verify the minimum amount out
-        // uint256 calculatedMinAmountOut = vault.calculateMinimimAmountOut(
-        //     inToken,
-        //     outToken,
-        //     swapAmount,
-        //     minAmountOut
-        // );
-        // assertGe(
-        //     swapData.amountOutMinimum,
-        //     calculatedMinAmountOut,
-        //     "Incorrect minimum amount out"
-        // );
-        // assertGe(
-        //     swapData.amountOutMinimum,
-        //     minAmountOut,
-        //     "Minimum amount out should be at least the user-specified value"
-        // );
+        // Add WBTC collateral
+        vm.startPrank(_owner);
+
+        // Prepare swap parameters
+        bytes32 inToken = bytes32("WBTC");
+        bytes32 outToken = bytes32("ETH");
+        uint256 swapAmount = 0.1 * 1e8; // 0.1 WBTC
+        uint256 minAmountOut = 1 ether; // Expect at least 1 ETH
+        uint24 poolFee = 3000; // 0.3% pool fee
+
+        // Execute swap
+        vault.swap(inToken, outToken, swapAmount, poolFee, minAmountOut);
+
+        // Verify MockSwapData
+        ISwapRouter.MockSwapData memory swapData = swapRouterMockContract
+            .receivedSwap();
+        assertEq(swapData.tokenIn, address(WBTC), "Incorrect tokenIn");
+        assertEq(
+            swapData.tokenOut,
+            address(proxySmartVaultManager.weth()),
+            "Incorrect tokenOut"
+        );
+        assertEq(swapData.fee, poolFee, "Incorrect pool fee");
+        assertEq(swapData.recipient, address(vault), "Incorrect recipient");
+
+        uint256 swapFee = (swapAmount * proxySmartVaultManager.swapFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+        assertEq(swapData.amountIn, swapAmount - swapFee, "Incorrect amountIn");
+        assertGe(
+            swapData.amountOutMinimum,
+            minAmountOut,
+            "Incorrect amountOutMinimum"
+        );
 
         vm.stopPrank();
     }
@@ -650,9 +592,9 @@ contract SmartVaultTest is HelperTest {
     //     vault = _vaults[0];
 
     //     // Step 2: Get vault status and calculate maxMintable
-    //     VaultifyStructs.Status memory vaultStatus = vault.status();
+    //     VaultifyStructs.VaultStatus memory vaultStatus = vault.vaultStatus();
     //     uint256 totalCollateralValue = vaultStatus.totalCollateralValue;
-    //     uint256 maxMintable = vaultStatus.maxMintable;
+    //     uint256 maxMintable = vaultStatus.maxBorrowableEuros;
 
     //     console.log("Euro Collateral:", totalCollateralValue);
     //     console.log("Max Mintable Euros:", maxMintable);
@@ -660,7 +602,7 @@ contract SmartVaultTest is HelperTest {
     //     // Step 3: Mint/borrow 80% of maxMintable
     //     uint256 mintAmount = (maxMintable * 80) / 100;
     //     vm.prank(alice);
-    //     vault.borrowMint(alice, mintAmount);
+    //     vault.borrow(alice, mintAmount);
 
     //     // Step 4: Attempt to swap more than 12% of collateral (let's try 15%)
     //     uint256 swapAmount = (totalCollateralValue * 15) / 100;
@@ -704,9 +646,9 @@ contract SmartVaultTest is HelperTest {
     //     );
 
     //     // Step 6: Get updated vault status
-    //     vaultStatus = vault.status();
+    //     vaultStatus = vault.vaultStatus();
     //     uint256 newTotalCollateralValue = vaultStatus.totalCollateralValue;
-    //     uint256 mintedEuros = vaultStatus.minted;
+    //     uint256 mintedEuros = vaultStatus.borrowedAmount;
 
     //     // Verify that the vault remains collateralized
     //     uint256 requiredCollateralValue = (mintedEuros *
@@ -721,7 +663,10 @@ contract SmartVaultTest is HelperTest {
     //     // );
 
     //     console.log("New Euro Collateral:", newTotalCollateralValue / 1e18);
-    //     console.log("required Collateral Value:", requiredCollateralValue / 1e18);
+    //     console.log(
+    //         "required Collateral Value:",
+    //         requiredCollateralValue / 1e18
+    //     );
     //     console.log("Minted Euros:", mintedEuros);
     //     console.log("Swap of more than allowed amount handled correctly");
     // }

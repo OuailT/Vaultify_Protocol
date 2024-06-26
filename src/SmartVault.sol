@@ -29,7 +29,7 @@ contract SmartVault is ISmartVault {
 
     // State variables
     address public owner; ///< Owner of the Smart Vault.
-    uint256 private mintedEuros; ///< Amount of EUROs minted in this vault.
+    uint256 private borrowedEuros; ///< Amount of EUROs minted in this vault.
     bool private liquidated; ///< Flag indicating if the vault has been liquidated.
     ISmartVaultManager private smartVaultManager;
 
@@ -75,7 +75,7 @@ contract SmartVault is ISmartVault {
     }
 
     modifier ifEurosMinted(uint256 _amount) {
-        if (mintedEuros < _amount)
+        if (borrowedEuros < _amount)
             revert VaultifyErrors.InsufficientEurosMinted(_amount);
         _;
     }
@@ -91,7 +91,7 @@ contract SmartVault is ISmartVault {
 
     /// @notice Calculates the total collateral value in EUROs within the vault.
     /// @dev Sums up the EURO value of all accepted tokens in the vault.
-    function euroCollateral() internal view returns (uint256 euro) {
+    function totalCollateralInEuros() internal view returns (uint256 euro) {
         // Get accepted tokens by the manager
         VaultifyStructs.Token[] memory acceptedTokens = getTokenManager()
             .getAcceptedTokens();
@@ -120,12 +120,12 @@ contract SmartVault is ISmartVault {
     ) private view returns (uint256) {
         // The percentage of minted token(borrowed token) that must be backed by collateral
         // to keep vault collatalized
-        uint256 requiredCollateralValue = (mintedEuros *
+        uint256 requiredCollateralValue = (borrowedEuros *
             smartVaultManager.collateralRate()) /
             smartVaultManager.HUNDRED_PRC();
 
         // The amount of collateral held in the vault in EUROs after the swap
-        uint256 collateralValueMinusSwapValue = euroCollateral() -
+        uint256 collateralValueMinusSwapValue = totalCollateralInEuros() -
             calculator.tokenToEuroAvg(getToken(_inTokenSymbol), _amount);
 
         // 10 PAXG =>
@@ -164,18 +164,22 @@ contract SmartVault is ISmartVault {
      * @notice Provides the current status of the vault.
      * @return The status details of the vault.
      */
-    function status() external view returns (VaultifyStructs.Status memory) {
+    function vaultStatus()
+        external
+        view
+        returns (VaultifyStructs.VaultStatus memory)
+    {
         return
-            VaultifyStructs.Status(
-                address(this),
-                mintedEuros,
-                MaxMintableEuros(),
-                euroCollateral(),
-                getAssets(),
-                liquidated,
-                VERSION,
-                VAULT_TYPE
-            );
+            VaultifyStructs.VaultStatus({
+                vaultAddress: address(this),
+                borrowedAmount: borrowedEuros,
+                maxBorrowableEuros: calculateMaxBorrowableEuros(),
+                totalCollateralValue: totalCollateralInEuros(),
+                collateralAssets: getAssets(),
+                isLiquidated: liquidated,
+                version: VERSION,
+                vaultType: VAULT_TYPE
+            });
     }
 
     /**
@@ -225,12 +229,12 @@ contract SmartVault is ISmartVault {
     }
 
     /**
-     * @notice Calculates the maximum amount of EUROs that can be minted based on the collateral.
-     * @return The maximum mintable EUROs.
+     * @notice Calculates the maximum amount of EUROs that can be borrowed based on the current collateral.
+     * @return The maximum borrowable EUROs.
      */
-    function MaxMintableEuros() internal view returns (uint256) {
+    function calculateMaxBorrowableEuros() internal view returns (uint256) {
         return
-            (euroCollateral() * smartVaultManager.HUNDRED_PRC()) /
+            (totalCollateralInEuros() * smartVaultManager.HUNDRED_PRC()) /
             smartVaultManager.collateralRate();
     }
 
@@ -240,7 +244,7 @@ contract SmartVault is ISmartVault {
      * @return True if the vault remains fully collateralized, otherwise false.
      */
     function fullyCollateralised(uint256 _amount) private view returns (bool) {
-        return mintedEuros + _amount <= MaxMintableEuros();
+        return borrowedEuros + _amount <= calculateMaxBorrowableEuros();
     }
 
     /**
@@ -248,7 +252,7 @@ contract SmartVault is ISmartVault {
      * @return True if the vault is under-collateralized, otherwise false.
      */
     function underCollateralised() public view returns (bool) {
-        return mintedEuros > MaxMintableEuros();
+        return borrowedEuros > calculateMaxBorrowableEuros();
     }
 
     /**
@@ -260,7 +264,7 @@ contract SmartVault is ISmartVault {
             revert VaultifyErrors.VaultNotLiquidatable();
 
         liquidated = true;
-        mintedEuros = 0;
+        borrowedEuros = 0;
         liquidateNative();
         VaultifyStructs.Token[] memory tokens = getTokenManager()
             .getAcceptedTokens();
@@ -299,10 +303,11 @@ contract SmartVault is ISmartVault {
     }
 
     /**
-     * @notice Mints new EURO tokens to a specified address.
-     * @param _amount The amount of tokens to mint.
+     * @notice Borrows EURO tokens and transfers them to a specified address.
+     * @param _to The address to receive the borrowed EUROs.
+     * @param _amount The amount of EUROs to borrow.
      */
-    function borrowMint(
+    function borrow(
         address _to,
         uint256 _amount
     ) external ifNotLiquidated onlyVaultOwner {
@@ -314,7 +319,7 @@ contract SmartVault is ISmartVault {
             revert VaultifyErrors.UnderCollateralisedVault(address(this));
         }
 
-        mintedEuros += _amount;
+        borrowedEuros += _amount;
 
         EUROs.mint(_to, _amount - fee);
 
@@ -325,10 +330,10 @@ contract SmartVault is ISmartVault {
     }
 
     /**
-     * @notice Burns EURO tokens from the caller's account.
-     * @param _amount The amount of EURO tokens to burn.
+     * @notice Repays borrowed EURO tokens from the caller's account.
+     * @param _amount The amount of EURO tokens to repay.
      */
-    function burnEuros(
+    function repay(
         uint256 _amount
     ) external ifEurosMinted(_amount) onlyVaultOwner {
         // Check if this contract has enough allowance of euro tokens to burn;
@@ -347,7 +352,7 @@ contract SmartVault is ISmartVault {
         // 50_000 EUROS - Fee = Amount to brun therefore, burn can only
         // with the amount that alice has of euros.
 
-        mintedEuros -= _amount;
+        borrowedEuros -= _amount;
 
         EUROs.burn(msg.sender, _amount - fee);
 
@@ -370,7 +375,7 @@ contract SmartVault is ISmartVault {
         );
 
         if (EUROs.balanceOf(msg.sender) == 0) {
-            mintedEuros = 0;
+            borrowedEuros = 0;
         }
 
         emit VaultifyEvents.EUROsBurned(_amount - fee, fee);
@@ -397,18 +402,20 @@ contract SmartVault is ISmartVault {
         VaultifyStructs.Token memory _token,
         uint256 _amount
     ) private view returns (bool) {
-        if (mintedEuros == 0) return true;
+        // If the user didn't borrow any EUROS yet then return true to remove his collateral.
+        if (borrowedEuros == 0) return true;
 
         // The Maximum amount of EUROS to mint based on the collateral held in the vault.
-        uint256 currentMintable = MaxMintableEuros();
+        uint256 currentBorrowedEuros = calculateMaxBorrowableEuros();
 
-        // The avg in EUROS of the amount of token to remove from the vault
+        // The avg rpiv in EUROS of the amount of token to remove from the vault
         uint256 euroValueToRemove = calculator.tokenToEuroAvg(_token, _amount);
 
         // Ensures that the minted amount of minted EURO in the vault still backed by collateral after removing some collateral.
+        // After removal, the remaining collateral must covers the already borrowed Euros.
         return
-            currentMintable >= euroValueToRemove &&
-            mintedEuros <= currentMintable - euroValueToRemove;
+            currentBorrowedEuros >= euroValueToRemove &&
+            borrowedEuros <= currentBorrowedEuros - euroValueToRemove;
     }
 
     /**
@@ -548,11 +555,8 @@ contract SmartVault is ISmartVault {
         uint256 swapFee = (_amount * smartVaultManager.swapFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        if (_minAmountOut > _amount)
-            revert VaultifyErrors.Incorrect_MinAmountOut(
-                "Minimum amount out cannot be greater than the input amount."
-            );
-        // add fee ! 0 or within a range
+        if (_amount == 0) revert VaultifyErrors.ZeroValue();
+
         address inToken = getSwapAddressFor(_inTokenSymbol);
 
         uint256 minimumAmountOut = calculateMinimimAmountOut(

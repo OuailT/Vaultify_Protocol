@@ -58,14 +58,12 @@ contract SmartVault is ISmartVault {
     // The vault owner
     /// @notice Modifier to allow only the owner of the vault to call a function.
     modifier onlyVaultOwner() {
-        if (owner != msg.sender)
-            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
+        if (owner != msg.sender) revert VaultifyErrors.UnauthorizedCaller();
         _;
     }
 
     modifier onlyVaultManager() {
-        if (manager != msg.sender)
-            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
+        if (manager != msg.sender) revert VaultifyErrors.UnauthorizedCaller();
         _;
     }
 
@@ -428,9 +426,11 @@ contract SmartVault is ISmartVault {
         address payable _to
     ) external onlyVaultOwner {
         bool canRemoveNative = canRemoveCollateral(getToken(NATIVE), _amount);
+        uint256 vaultEthBal = address(this).balance;
 
         if (!canRemoveNative) revert VaultifyErrors.NativeRemove_Err();
-        if (_amount < 0) revert VaultifyErrors.ZeroValue();
+        if (_amount > vaultEthBal) revert VaultifyErrors.NotEnoughEthBalance();
+        if (_amount <= 0) revert VaultifyErrors.ZeroValue();
         if (_to == address(0)) revert VaultifyErrors.ZeroAddress();
 
         (bool succ, ) = _to.call{value: _amount}("");
@@ -451,12 +451,15 @@ contract SmartVault is ISmartVault {
         address _to
     ) external onlyVaultOwner {
         VaultifyStructs.Token memory _token = getToken(_symbol);
+        uint256 vaultTokenBal = IERC20(_token.addr).balanceOf(address(this));
 
         bool canRemoveERC20 = canRemoveCollateral(_token, _amount);
 
         if (!canRemoveERC20) revert VaultifyErrors.TokenRemove_Err();
-        if (_amount < 0) revert VaultifyErrors.ZeroValue();
+        if (_amount <= 0) revert VaultifyErrors.ZeroValue();
         if (_to == address(0)) revert VaultifyErrors.ZeroAddress();
+        if (_amount > vaultTokenBal)
+            revert VaultifyErrors.NotEnoughTokenBalance();
 
         IERC20(_token.addr).safeTransfer(_to, _amount);
 

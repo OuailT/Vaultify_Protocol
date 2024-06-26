@@ -5,6 +5,7 @@ import {HelperTest} from "./HelperTest.t.sol";
 import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
+import {VaultifyErrors} from "src/libraries/VaultifyErrors.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import "forge-std/console.sol";
 
@@ -670,4 +671,207 @@ contract SmartVaultTest is HelperTest {
     //     console.log("Minted Euros:", mintedEuros);
     //     console.log("Swap of more than allowed amount handled correctly");
     // }
+
+    function test_RemoveNativeCollateral_Successful() public {
+        console.log("Testing successful removal of native collateral");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 initialBalance = address(vault).balance;
+        uint256 amountToRemove = 1 ether;
+        uint256 initialOwnerBalance = _owner.balance;
+
+        vm.startPrank(_owner);
+        vault.removeNativeCollateral(amountToRemove, payable(_owner));
+        vm.stopPrank();
+
+        assertEq(
+            address(vault).balance,
+            initialBalance - amountToRemove,
+            "Incorrect vault balance after removal"
+        );
+        assertEq(
+            _owner.balance,
+            initialOwnerBalance + amountToRemove,
+            "Incorrect owner balance after removal"
+        );
+    }
+
+    function test_RemoveNativeCollateral_ExceedingAvailable() public {
+        console.log(
+            "Testing removal of native collateral exceeding available amount"
+        );
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 excessAmount = address(vault).balance + 1 ether;
+
+        vm.startPrank(_owner);
+        vm.expectRevert(VaultifyErrors.NotEnoughEthBalance.selector);
+        vault.removeNativeCollateral(excessAmount, payable(_owner));
+        vm.stopPrank();
+    }
+
+    function test_RemoveNativeCollateral_AfterBorrowing() public {
+        console.log("Testing removal of native collateral after borrowing");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 borrowAmount = 50 * 1e18;
+        uint256 removeAmount = 1 ether;
+
+        uint256 initialBalance = address(vault).balance;
+        uint256 initialOwnerBalance = _owner.balance;
+
+        vm.startPrank(_owner);
+        vault.borrow(_owner, borrowAmount);
+
+        VaultifyStructs.VaultStatus memory statusBeforeRemoval = vault
+            .vaultStatus();
+
+        vault.removeNativeCollateral(removeAmount, payable(_owner));
+
+        VaultifyStructs.VaultStatus memory statusAfterRemoval = vault
+            .vaultStatus();
+
+        assertLt(
+            statusAfterRemoval.totalCollateralValue,
+            statusBeforeRemoval.totalCollateralValue,
+            "Collateral value should decrease"
+        );
+
+        assertEq(
+            address(vault).balance,
+            initialBalance - removeAmount,
+            "Incorrect vault balance after removal"
+        );
+        assertEq(
+            _owner.balance,
+            initialOwnerBalance + removeAmount,
+            "Incorrect owner balance after removal"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_RemoveERC20Collateral_Successful() public {
+        console.log("Testing successful removal of ERC20 collateral");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 initialBalance = WBTC.balanceOf(address(vault));
+        uint256 initalOwnerBalance = WBTC.balanceOf(address(_owner));
+        uint256 amountToRemove = 0.5 * 1e8; // 0.5 WBTC
+
+        vm.startPrank(_owner);
+        vault.removeERC20Collateral(bytes32("WBTC"), amountToRemove, _owner);
+        vm.stopPrank();
+
+        assertEq(
+            WBTC.balanceOf(address(vault)),
+            initialBalance - amountToRemove,
+            "Incorrect vault WBTC balance after removal"
+        );
+        assertEq(
+            WBTC.balanceOf(_owner),
+            amountToRemove + initalOwnerBalance,
+            "Incorrect owner WBTC balance after removal"
+        );
+    }
+
+    function test_RemoveERC20Collateral_ExceedingAvailable() public {
+        console.log(
+            "Testing removal of ERC20 collateral exceeding available amount"
+        );
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 excessAmount = WBTC.balanceOf(address(vault)) + 1;
+
+        vm.startPrank(_owner);
+        vm.expectRevert(VaultifyErrors.NotEnoughTokenBalance.selector);
+        vault.removeERC20Collateral(bytes32("WBTC"), excessAmount, _owner);
+        vm.stopPrank();
+    }
+
+    function test_RemoveERC20Collateral_AfterBorrowing() public {
+        console.log("Testing removal of ERC20 collateral after borrowing");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 borrowAmount = 50 * 1e18;
+        uint256 removeAmount = 0.5 * 1e8; // 0.5 WBTC
+
+        vm.startPrank(_owner);
+        vault.borrow(_owner, borrowAmount);
+
+        VaultifyStructs.VaultStatus memory statusBeforeRemoval = vault
+            .vaultStatus();
+
+        vault.removeERC20Collateral(bytes32("WBTC"), removeAmount, _owner);
+
+        VaultifyStructs.VaultStatus memory statusAfterRemoval = vault
+            .vaultStatus();
+
+        assertLt(
+            statusAfterRemoval.totalCollateralValue,
+            statusBeforeRemoval.totalCollateralValue,
+            "Collateral value should decrease"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_RemoveCollateral_NonOwner() public {
+        console.log("Testing removal of collateral by non-owner");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        address nonOwner = address(0x123444);
+
+        vm.startPrank(nonOwner);
+        vm.expectRevert(VaultifyErrors.UnauthorizedCaller.selector);
+        vault.removeNativeCollateral(1 ether, payable(nonOwner));
+
+        vm.expectRevert(VaultifyErrors.UnauthorizedCaller.selector);
+        vault.removeERC20Collateral(bytes32("WBTC"), 0.1 * 1e8, nonOwner);
+        vm.stopPrank();
+    }
+
+    function test_RemoveCollateral_ZeroAmount() public {
+        console.log("Testing removal of zero collateral amount");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        vm.startPrank(_owner);
+        vm.expectRevert(VaultifyErrors.ZeroValue.selector);
+        vault.removeNativeCollateral(0, payable(_owner));
+
+        vm.expectRevert(VaultifyErrors.ZeroValue.selector);
+        vault.removeERC20Collateral(bytes32("WBTC"), 0, _owner);
+        vm.stopPrank();
+    }
+
+    function test_RemoveCollateral_ZeroAddress() public {
+        console.log("Testing removal of collateral to zero address");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        vm.startPrank(_owner);
+        vm.expectRevert(VaultifyErrors.ZeroAddress.selector);
+        vault.removeNativeCollateral(1 ether, payable(address(0)));
+
+        vm.expectRevert(VaultifyErrors.ZeroAddress.selector);
+        vault.removeERC20Collateral(bytes32("WBTC"), 0.1 * 1e8, address(0));
+        vm.stopPrank();
+    }
 }

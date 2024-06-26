@@ -75,7 +75,7 @@ contract LiquidationPool is ILiquidationPool {
 
     modifier onlyPoolManager() {
         if (msg.sender != poolManager)
-            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
+            revert VaultifyErrors.UnauthorizedCaller();
         _;
     }
 

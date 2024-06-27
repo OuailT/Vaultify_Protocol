@@ -173,9 +173,9 @@ contract SmartVaultManager is
             smartVaultIndexContract.getVaultAddress(_tokenId)
         );
 
-        try vault.underCollateralised() returns (bool _undercollateralised) {
-            if (!_undercollateralised)
-                revert VaultifyErrors.VaultNotUnderCollateralised(
+        try vault.underCollateralized() returns (bool _undercollateralized) {
+            if (!_undercollateralized)
+                revert VaultifyErrors.VaultNotUnderCollateralized(
                     address(vault)
                 );
 

@@ -72,9 +72,16 @@ contract SmartVault is ISmartVault {
         _;
     }
 
-    modifier ifEurosMinted(uint256 _amount) {
-        if (borrowedEuros < _amount)
-            revert VaultifyErrors.InsufficientEurosMinted(_amount);
+    modifier requireNonZeroAmount(uint256 _amount) {
+        if (_amount == 0) {
+            revert VaultifyErrors.ZeroAmountNotAllowed();
+        }
+        _;
+    }
+
+    modifier ensureValidRepayAmount(uint256 _amount) {
+        if (_amount > borrowedEuros)
+            revert VaultifyErrors.ExcessiveRepayAmount(borrowedEuros, _amount);
         _;
     }
 
@@ -241,7 +248,7 @@ contract SmartVault is ISmartVault {
      * @param _amount The amount to mint.
      * @return True if the vault remains fully collateralized, otherwise false.
      */
-    function fullyCollateralised(uint256 _amount) private view returns (bool) {
+    function fullyCollateralized(uint256 _amount) private view returns (bool) {
         return borrowedEuros + _amount <= calculateMaxBorrowableEuros();
     }
 
@@ -249,7 +256,7 @@ contract SmartVault is ISmartVault {
      * @notice Checks if the vault is under-collateralized.
      * @return True if the vault is under-collateralized, otherwise false.
      */
-    function underCollateralised() public view returns (bool) {
+    function underCollateralized() public view returns (bool) {
         return borrowedEuros > calculateMaxBorrowableEuros();
     }
 
@@ -258,7 +265,7 @@ contract SmartVault is ISmartVault {
      */
     function liquidate() external onlyVaultManager {
         // Check if the vault is collaterlized
-        if (!underCollateralised())
+        if (!underCollateralized())
             revert VaultifyErrors.VaultNotLiquidatable();
 
         liquidated = true;
@@ -308,13 +315,13 @@ contract SmartVault is ISmartVault {
     function borrow(
         address _to,
         uint256 _amount
-    ) external ifNotLiquidated onlyVaultOwner {
+    ) external ifNotLiquidated onlyVaultOwner requireNonZeroAmount(_amount) {
         // Get the borrow/mint Euro Fee
         uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        if (!fullyCollateralised(_amount)) {
-            revert VaultifyErrors.UnderCollateralisedVault(address(this));
+        if (!fullyCollateralized(_amount)) {
+            revert VaultifyErrors.UnderCollateralizedVault(address(this));
         }
 
         borrowedEuros += _amount;
@@ -327,13 +334,20 @@ contract SmartVault is ISmartVault {
         emit VaultifyEvents.EUROsMinted(_to, _amount - fee, fee);
     }
 
+    // TODO Add RepayFull function
+
     /**
      * @notice Repays borrowed EURO tokens from the caller's account.
      * @param _amount The amount of EURO tokens to repay.
      */
     function repay(
         uint256 _amount
-    ) external ifEurosMinted(_amount) onlyVaultOwner {
+    )
+        external
+        ensureValidRepayAmount(_amount)
+        onlyVaultOwner
+        requireNonZeroAmount(_amount)
+    {
         // Check if this contract has enough allowance of euro tokens to burn;
         bool euroApproved = IERC20(EUROs).allowance(
             msg.sender,
@@ -353,18 +367,6 @@ contract SmartVault is ISmartVault {
         borrowedEuros -= _amount;
 
         EUROs.burn(msg.sender, _amount - fee);
-
-        // Execute approve function in the context of the caller msg.sender to approve this contract
-        // to spend/transfer the fees to the liquidator
-        // (bool succ, ) = address(EUROs).delegatecall(
-        //     abi.encodeWithSignature(
-        //         "approve(address,uint256)",
-        //         address(this),
-        //         fee
-        //     )
-        // );
-
-        // if (!succ) revert VaultifyErrors.DelegateCallFailed();
 
         IERC20(address(EUROs)).safeTransferFrom(
             msg.sender,

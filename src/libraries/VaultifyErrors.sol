@@ -8,11 +8,12 @@ library VaultifyErrors {
 
     //*** SmartVault.sol Erros  ***//
     error NotEnoughEthBalance();
+    error ZeroAmountNotAllowed();
     error NotEnoughTokenBalance();
     error UnauthorizedCaller();
     error VaultUnderColl();
     error LiquidatedVault(address vault);
-    error UnderCollateralisedVault(address vault);
+    error UnderCollateralizedVault(address vault);
     error InsufficientEurosMinted(uint256 _value);
     error NotEnoughAllowance(uint256 _value);
     error DelegateCallFailed();
@@ -24,9 +25,10 @@ library VaultifyErrors {
     error ZeroAddress();
     error NativeRemove_Err();
     error TokenRemove_Err();
-    error VaultNotUnderCollateralised(address vault);
+    error VaultNotUnderCollateralized(address vault);
     error NotEnoughEurosAllowance();
     error NotEnoughTstAllowance();
     error InvalidDecrementAmount();
     error Incorrect_MinAmountOut(string message);
+    error ExcessiveRepayAmount(uint256 borrowed, uint256 amount);
 }

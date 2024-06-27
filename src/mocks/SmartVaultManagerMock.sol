@@ -175,9 +175,9 @@ contract SmartVaultManagerMock is
             smartVaultIndexContract.getVaultAddress(_tokenId)
         );
 
-        try vault.underCollateralised() returns (bool _undercollateralised) {
+        try vault.underCollateralized() returns (bool _undercollateralised) {
             if (!_undercollateralised)
-                revert VaultifyErrors.VaultNotUnderCollateralised(
+                revert VaultifyErrors.VaultNotUnderCollateralized(
                     address(vault)
                 );
 

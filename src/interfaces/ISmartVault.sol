@@ -12,7 +12,7 @@ interface ISmartVault {
         external
         view
         returns (VaultifyStructs.VaultStatus memory);
-    function underCollateralised() external view returns (bool);
+    function underCollateralized() external view returns (bool);
     function setOwner(address _newOwner) external;
     function liquidate() external;
     function borrow(address _to, uint256 _amount) external;
@@ -35,4 +35,6 @@ interface ISmartVault {
         uint256 _amount,
         address _to
     ) external;
+
+    function manager() external view returns (address);
 }

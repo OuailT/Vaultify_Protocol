@@ -7,10 +7,12 @@ library VaultifyErrors {
     error InvalidPrice();
 
     //*** SmartVault.sol Erros  ***//
+    error InsufficientBalance(address caller, uint256 balance, uint256 amount);
     error NotEnoughEthBalance();
+    error NothingToRepay();
     error ZeroAmountNotAllowed();
     error NotEnoughTokenBalance();
-    error UnauthorizedCaller();
+    error UnauthorizedCaller(address caller);
     error VaultUnderColl();
     error LiquidatedVault(address vault);
     error UnderCollateralizedVault(address vault);
@@ -23,8 +25,8 @@ library VaultifyErrors {
     error NativeTxFailed();
     error ZeroValue();
     error ZeroAddress();
-    error NativeRemove_Err();
-    error TokenRemove_Err();
+    error NativeRemovalNotAllowed();
+    error TokenRemovalNotAllowed();
     error VaultNotUnderCollateralized(address vault);
     error NotEnoughEurosAllowance();
     error NotEnoughTstAllowance();

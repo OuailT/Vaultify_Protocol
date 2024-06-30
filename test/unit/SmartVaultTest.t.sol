@@ -206,6 +206,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.stopPrank();
 
         vm.startPrank(_owner);
+
         _expectRevertWithCustomError({
             target: address(vault),
             callData: abi.encodeWithSelector(
@@ -219,6 +220,17 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
                 vault
             )
         });
+
+        // _expectRevertWith({
+        //     target: address(vault),
+        //     callData: abi.encodeWithSelector(
+        //         vault.borrow.selector,
+        //         _owner,
+        //         50 * 1e18
+        //     ),
+        //     revertMessage: " "
+        // });
+
         vm.stopPrank();
     }
 
@@ -236,9 +248,10 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
                 _nonOwner,
                 0
             ),
-            expectedErrorSignature: "UnauthorizedCaller()",
+            expectedErrorSignature: "UnauthorizedCaller(address)",
             errorData: abi.encodeWithSelector(
-                VaultifyErrors.UnauthorizedCaller.selector
+                VaultifyErrors.UnauthorizedCaller.selector,
+                _nonOwner
             )
         });
         vm.stopPrank();
@@ -481,7 +494,9 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.stopPrank();
     }
 
-    // TODO: ADD TEST REVERT for BORROW MINT: HERE
+    ////////////////////////////////////////////
+    //        Revert test for Borrow Function //
+    /////////////////////////////////////////////
 
     function test_revert_repay_zeroAmount() public {
         console.log("Testing repay with zero amount");
@@ -512,23 +527,128 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
 
         vm.startPrank(_owner);
         vault.borrow(_owner, borrowAmount);
+
+        // Not approving EUROs for repayment
+        _expectRevertWithCustomError({
+            target: address(vault),
+            callData: abi.encodeWithSelector(vault.repay.selector, repayAmount),
+            expectedErrorSignature: "NotEnoughAllowance(uint256)",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.NotEnoughAllowance.selector,
+                repayAmount
+            )
+        });
         vm.stopPrank();
+    }
+
+    function test_revert_repay_notVaultOwner() public {
+        console.log("Testing repay by non-vault owner");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        address nonOwner = address(0x123);
+        uint256 repayAmount = 5 * 1e18;
+
+        vm.prank(_owner);
+        vault.borrow(_owner, 10 * 1e18);
+
+        vm.prank(nonOwner);
+        _expectRevertWithCustomError({
+            target: address(vault),
+            callData: abi.encodeWithSelector(vault.repay.selector, repayAmount),
+            expectedErrorSignature: "UnauthorizedCaller(address)",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.UnauthorizedCaller.selector,
+                nonOwner
+            )
+        });
+    }
+
+    function test_revert_repay_excessiveAmount() public {
+        console.log("Testing repay with excessive amount");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 borrowAmount = 10 * 1e18;
+        uint256 excessiveRepayAmount = 11 * 1e18;
 
         vm.startPrank(_owner);
+        vault.borrow(_owner, borrowAmount);
+
+        _expectRevertWithCustomError({
+            target: address(vault),
+            callData: abi.encodeWithSelector(
+                vault.repay.selector,
+                excessiveRepayAmount
+            ),
+            expectedErrorSignature: "ExcessiveRepayAmount(uint256,uint256)",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.ExcessiveRepayAmount.selector,
+                borrowAmount,
+                excessiveRepayAmount
+            )
+        });
+        vm.stopPrank();
+    }
+
+    function test_revert_repay_insufficientBalance() public {
+        console.log("Testing repay with insufficient balance");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 borrowAmount = 10 * 1e18;
+        uint256 repayAmount = 5 * 1e18;
+
+        vm.startPrank(_owner);
+        vault.borrow(_owner, borrowAmount);
+        EUROs.approve(address(vault), repayAmount);
+
+        // Transfer to alice to create insufficient balance
+        EUROs.transfer(alice, 9 * 1e18);
+
+        // Calculate the fee and total repayment
+        uint256 fee = (repayAmount * proxySmartVaultManager.burnFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+        uint256 totalRepayment = repayAmount + fee;
+
+        _expectRevertWithCustomError({
+            target: address(vault),
+            callData: abi.encodeWithSelector(vault.repay.selector, repayAmount),
+            expectedErrorSignature: "InsufficientBalance(address,uint256,uint256)",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.InsufficientBalance.selector,
+                _owner,
+                EUROs.balanceOf(_owner),
+                totalRepayment
+            )
+        });
+        vm.stopPrank();
+    }
+
+    function test_repay_event_emission() public {
+        console.log("Testing repay event emission");
+
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
+
+        uint256 borrowAmount = 10 * 1e18;
+        uint256 repayAmount = 5 * 1e18;
+
+        vm.startPrank(_owner);
+        vault.borrow(_owner, borrowAmount);
+        EUROs.approve(address(vault), repayAmount);
+
+        uint256 fee = (repayAmount * proxySmartVaultManager.burnFeeRate()) /
+            proxySmartVaultManager.HUNDRED_PRC();
+
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EUROsBurned(repayAmount - fee, fee);
+
         vault.repay(repayAmount);
         vm.stopPrank();
-
-        // TODO: Stoped at : check not enough allowance Error message
-        // // // // Not approving EUROs for repayment
-        // _expectRevertWithCustomError({
-        //     target: address(vault),
-        //     callData: abi.encodeWithSelector(vault.repay.selector, repayAmount),
-        //     expectedErrorSignature: "NotEnoughAllowance(uint256)",
-        //     errorData: abi.encodeWithSelector(
-        //         VaultifyErrors.NotEnoughAllowance.selector,
-        //         repayAmount
-        //     )
-        // });
     }
 
     /*********************************************************
@@ -997,35 +1117,74 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.stopPrank();
     }
 
-    function test_RemoveCollateral_ZeroAmount() public {
-        console.log("Testing removal of zero collateral amount");
+    // PIN
+    /////////////////////////////////////////////
+    //   Revert test for RemoveNtiveERC20 //
+    /////////////////////////////////////////////
+    function test_revert_removeNativeCollateral_NativeRemovalNotAllowed()
+        public
+    {
+        console.log(
+            "Testing revert of removeNativeCollateral when removal is not allowed"
+        );
 
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
-        vm.startPrank(_owner);
-        vm.expectRevert(VaultifyErrors.ZeroValue.selector);
-        vault.removeNativeCollateral(0, payable(_owner));
+        VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
+        uint256 maxBorrowableEuros = initialStatus.maxBorrowableEuros;
 
-        vm.expectRevert(VaultifyErrors.ZeroValue.selector);
-        vault.removeERC20Collateral(bytes32("WBTC"), 0, _owner);
+        // Borrow 95% of max borrowable
+        uint256 amountToBorrow = (maxBorrowableEuros * 95) / 100;
+
+        // total collateral hold in the vault is 76,107EUROS were ETH represent aprox 26%.
+        // let remove the total amount of ETH after borrowing 95 percent of the total collateral
+        uint256 removeAmount = address(vault).balance;
+
+        vm.startPrank(_owner);
+        vault.borrow(_owner, amountToBorrow);
+
+        _expectRevertWithCustomError({
+            target: address(vault),
+            callData: abi.encodeWithSelector(
+                vault.removeNativeCollateral.selector,
+                removeAmount,
+                payable(_owner)
+            ),
+            expectedErrorSignature: "NativeRemovalNotAllowed()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.NativeRemovalNotAllowed.selector
+            )
+        });
         vm.stopPrank();
     }
 
-    function test_RemoveCollateral_ZeroAddress() public {
-        console.log("Testing removal of collateral to zero address");
+    function test_revert_removeNativeCollateral_NotEnoughEthBalance() public {
+        console.log(
+            "Testing revert of removeNativeCollateral when not enough ETH balance"
+        );
 
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
-        vm.startPrank(_owner);
-        vm.expectRevert(VaultifyErrors.ZeroAddress.selector);
-        vault.removeNativeCollateral(1 ether, payable(address(0)));
+        uint256 excessiveAmount = address(this).balance + 1 ether;
 
-        vm.expectRevert(VaultifyErrors.ZeroAddress.selector);
-        vault.removeERC20Collateral(bytes32("WBTC"), 0.1 * 1e8, address(0));
-        vm.stopPrank();
+        vm.prank(_owner);
+        _expectRevertWithCustomError({
+            target: address(vault),
+            callData: abi.encodeWithSelector(
+                vault.removeNativeCollateral.selector,
+                excessiveAmount,
+                payable(_owner)
+            ),
+            expectedErrorSignature: "NotEnoughEthBalance()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.NotEnoughEthBalance.selector
+            )
+        });
     }
+
+    // Stop Here
 
     /////////////////////////////////////////////
     //         liquidate Function unit tests    //
@@ -1157,9 +1316,10 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         _expectRevertWithCustomError({
             target: address(vault),
             callData: abi.encodeWithSelector(vault.liquidate.selector),
-            expectedErrorSignature: "UnauthorizedCaller()",
+            expectedErrorSignature: "UnauthorizedCaller(address)",
             errorData: abi.encodeWithSelector(
-                VaultifyErrors.UnauthorizedCaller.selector
+                VaultifyErrors.UnauthorizedCaller.selector,
+                nonManager
             )
         });
         vm.stopPrank();

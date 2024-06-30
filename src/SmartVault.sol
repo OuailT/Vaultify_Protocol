@@ -29,7 +29,7 @@ contract SmartVault is ISmartVault {
 
     // State variables
     address public owner; ///< Owner of the Smart Vault.
-    uint256 private borrowedEuros; ///< Amount of EUROs minted in this vault.
+    uint256 public borrowedEuros; ///< Amount of EUROs minted in this vault.
     bool private liquidated; ///< Flag indicating if the vault has been liquidated.
     ISmartVaultManager private smartVaultManager;
 
@@ -58,12 +58,14 @@ contract SmartVault is ISmartVault {
     // The vault owner
     /// @notice Modifier to allow only the owner of the vault to call a function.
     modifier onlyVaultOwner() {
-        if (owner != msg.sender) revert VaultifyErrors.UnauthorizedCaller();
+        if (owner != msg.sender)
+            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
         _;
     }
 
     modifier onlyVaultManager() {
-        if (manager != msg.sender) revert VaultifyErrors.UnauthorizedCaller();
+        if (manager != msg.sender)
+            revert VaultifyErrors.UnauthorizedCaller(msg.sender);
         _;
     }
 
@@ -320,21 +322,20 @@ contract SmartVault is ISmartVault {
         uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        if (!fullyCollateralized(_amount)) {
+        uint256 totalAmount = _amount + fee;
+
+        if (!fullyCollateralized(totalAmount)) {
             revert VaultifyErrors.UnderCollateralizedVault(address(this));
         }
 
-        borrowedEuros += _amount;
+        borrowedEuros += totalAmount;
 
-        EUROs.mint(_to, _amount - fee);
+        EUROs.mint(_to, _amount);
 
-        // Fees goes to the vault liquidator
         EUROs.mint(smartVaultManager.liquidator(), fee);
 
-        emit VaultifyEvents.EUROsMinted(_to, _amount - fee, fee);
+        emit VaultifyEvents.EUROsMinted(_to, _amount, fee);
     }
-
-    // TODO Add RepayFull function
 
     /**
      * @notice Repays borrowed EURO tokens from the caller's account.
@@ -348,35 +349,31 @@ contract SmartVault is ISmartVault {
         onlyVaultOwner
         requireNonZeroAmount(_amount)
     {
-        // Check if this contract has enough allowance of euro tokens to burn;
-        bool euroApproved = IERC20(EUROs).allowance(
-            msg.sender,
-            address(this)
-        ) >= _amount;
-
-        // we already give the the contract the allowance amount which deduct the fee from?
-        // Why do we give the contract an approval again throught delegate call to spend the fee as the fee is already part of the amount
-
-        if (!euroApproved) revert VaultifyErrors.NotEnoughAllowance(_amount);
-
         uint256 fee = (_amount * smartVaultManager.burnFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
-        // 50_000 EUROS - Fee = Amount to brun therefore, burn can only
-        // with the amount that alice has of euros.
+
+        uint256 totalRepayment = _amount + fee;
+        uint256 borrowerBalance = IERC20(EUROs).balanceOf(msg.sender);
+
+        if (borrowerBalance < totalRepayment)
+            revert VaultifyErrors.InsufficientBalance({
+                caller: msg.sender,
+                balance: borrowerBalance,
+                amount: totalRepayment
+            });
+
+        if (IERC20(EUROs).allowance(msg.sender, address(this)) < totalRepayment)
+            revert VaultifyErrors.NotEnoughAllowance(totalRepayment);
 
         borrowedEuros -= _amount;
 
-        EUROs.burn(msg.sender, _amount - fee);
+        EUROs.burn(msg.sender, _amount);
 
         IERC20(address(EUROs)).safeTransferFrom(
             msg.sender,
             smartVaultManager.liquidator(),
             fee
         );
-
-        if (EUROs.balanceOf(msg.sender) == 0) {
-            borrowedEuros = 0;
-        }
 
         emit VaultifyEvents.EUROsBurned(_amount - fee, fee);
     }
@@ -430,10 +427,9 @@ contract SmartVault is ISmartVault {
         bool canRemoveNative = canRemoveCollateral(getToken(NATIVE), _amount);
         uint256 vaultEthBal = address(this).balance;
 
-        if (!canRemoveNative) revert VaultifyErrors.NativeRemove_Err();
+        if (!canRemoveNative) revert VaultifyErrors.NativeRemovalNotAllowed();
         if (_amount > vaultEthBal) revert VaultifyErrors.NotEnoughEthBalance();
         if (_amount <= 0) revert VaultifyErrors.ZeroValue();
-        if (_to == address(0)) revert VaultifyErrors.ZeroAddress();
 
         (bool succ, ) = _to.call{value: _amount}("");
         if (!succ) revert VaultifyErrors.NativeTxFailed();
@@ -457,7 +453,7 @@ contract SmartVault is ISmartVault {
 
         bool canRemoveERC20 = canRemoveCollateral(_token, _amount);
 
-        if (!canRemoveERC20) revert VaultifyErrors.TokenRemove_Err();
+        if (!canRemoveERC20) revert VaultifyErrors.TokenRemovalNotAllowed();
         if (_amount <= 0) revert VaultifyErrors.ZeroValue();
         if (_to == address(0)) revert VaultifyErrors.ZeroAddress();
         if (_amount > vaultTokenBal)

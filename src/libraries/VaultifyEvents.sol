@@ -9,6 +9,7 @@ library VaultifyEvents {
         address vaultTokenType,
         uint256 tokenId
     );
+
     event VaultLiquidated(address indexed vaultAddress);
     event VaultTransferred(uint256 indexed tokenId, address from, address to);
 
@@ -36,6 +37,8 @@ library VaultifyEvents {
         uint256 swapFee,
         uint256 amountOut
     );
+
+    event FullRepayment(address from, uint256 fee);
 
     event NativeCollateralRemoved(
         bytes32 _symbol,

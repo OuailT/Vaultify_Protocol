@@ -36,5 +36,7 @@ interface ISmartVault {
         address _to
     ) external;
 
+    function borrowedEuros() external view returns (uint256);
+
     function manager() external view returns (address);
 }

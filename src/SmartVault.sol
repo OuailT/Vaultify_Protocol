@@ -20,6 +20,7 @@ contract SmartVault is ISmartVault {
 
     uint8 private constant VERSION = 2;
     bytes32 private constant VAULT_TYPE = bytes32("Euros");
+    uint256 private constant DUST_THRESHOLD = 1e16;
 
     // Immutable variables
     bytes32 private immutable NATIVE; ///< Symbol of the native asset.
@@ -312,62 +313,73 @@ contract SmartVault is ISmartVault {
     /**
      * @notice Borrows EURO tokens and transfers them to a specified address.
      * @param _to The address to receive the borrowed EUROs.
-     * @param _amount The amount of EUROs to borrow.
+     * @param _amountToBorrow The amount of EUROs to borrow.
      */
     function borrow(
         address _to,
-        uint256 _amount
-    ) external ifNotLiquidated onlyVaultOwner requireNonZeroAmount(_amount) {
+        uint256 _amountToBorrow
+    )
+        external
+        ifNotLiquidated
+        onlyVaultOwner
+        requireNonZeroAmount(_amountToBorrow)
+    {
         // Get the borrow/mint Euro Fee
-        uint256 fee = (_amount * smartVaultManager.mintFeeRate()) /
+        uint256 fee = (_amountToBorrow * smartVaultManager.mintFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        uint256 totalAmount = _amount + fee;
+        uint256 amountToMint = _amountToBorrow - fee;
 
-        if (!fullyCollateralized(totalAmount)) {
+        if (!fullyCollateralized(_amountToBorrow)) {
             revert VaultifyErrors.UnderCollateralizedVault(address(this));
         }
 
-        borrowedEuros += totalAmount;
+        borrowedEuros += amountToMint;
 
-        EUROs.mint(_to, _amount);
+        EUROs.mint(_to, amountToMint);
 
         EUROs.mint(smartVaultManager.liquidator(), fee);
 
-        emit VaultifyEvents.EUROsMinted(_to, _amount, fee);
+        emit VaultifyEvents.EUROsMinted(_to, amountToMint, fee);
     }
 
     /**
      * @notice Repays borrowed EURO tokens from the caller's account.
-     * @param _amount The amount of EURO tokens to repay.
+     * @param _amountToRepay The amount of EURO tokens to repay.
      */
     function repay(
-        uint256 _amount
+        uint256 _amountToRepay
     )
         external
-        ensureValidRepayAmount(_amount)
+        ensureValidRepayAmount(_amountToRepay)
         onlyVaultOwner
-        requireNonZeroAmount(_amount)
+        requireNonZeroAmount(_amountToRepay)
     {
-        uint256 fee = (_amount * smartVaultManager.burnFeeRate()) /
+        uint256 fee = (_amountToRepay * smartVaultManager.burnFeeRate()) /
             smartVaultManager.HUNDRED_PRC();
 
-        uint256 totalRepayment = _amount + fee;
+        uint256 amountToBurn = _amountToRepay - fee;
+
         uint256 borrowerBalance = IERC20(EUROs).balanceOf(msg.sender);
 
-        if (borrowerBalance < totalRepayment)
+        if (borrowerBalance < _amountToRepay)
             revert VaultifyErrors.InsufficientBalance({
                 caller: msg.sender,
                 balance: borrowerBalance,
-                amount: totalRepayment
+                amount: _amountToRepay
             });
 
-        if (IERC20(EUROs).allowance(msg.sender, address(this)) < totalRepayment)
-            revert VaultifyErrors.NotEnoughAllowance(totalRepayment);
+        if (IERC20(EUROs).allowance(msg.sender, address(this)) < _amountToRepay)
+            revert VaultifyErrors.NotEnoughAllowance(_amountToRepay);
 
-        borrowedEuros -= _amount;
+        // Ensure borrowedEuros is set to zero for full repayment
+        if (_amountToRepay == borrowedEuros) {
+            borrowedEuros = 0;
+        } else {
+            borrowedEuros -= amountToBurn;
+        }
 
-        EUROs.burn(msg.sender, _amount);
+        EUROs.burn(msg.sender, amountToBurn);
 
         IERC20(address(EUROs)).safeTransferFrom(
             msg.sender,
@@ -375,7 +387,7 @@ contract SmartVault is ISmartVault {
             fee
         );
 
-        emit VaultifyEvents.EUROsBurned(_amount - fee, fee);
+        emit VaultifyEvents.EUROsBurned(amountToBurn, fee);
     }
 
     /**

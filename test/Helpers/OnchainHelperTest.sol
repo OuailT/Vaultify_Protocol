@@ -43,7 +43,7 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 // TODO: Create a function to mirror arbithrum.
 // // replace the address of uniswap ROUTER, PAXG, WBTC, WETH, TST, EUROS with the mocks.
 
-abstract contract HelperTest is Test {
+abstract contract OnchainHelperTest is Test {
     ISmartVault internal vault;
     // SETUP//
     ISmartVaultManagerMock public smartVaultManagerContract;
@@ -69,19 +69,27 @@ abstract contract HelperTest is Test {
     // address public smartVaultIndex;
     address public smartVaultDeployer;
 
-    address public swapRouterMock;
-
     // Assets Interfaces
     IEUROs public EUROs;
-    address public weth;
     IERC20Mock public TST; // Standard protocol
     IERC20Mock public WBTC;
     IERC20Mock public PAXG; // tokenized gold
 
-    address public euros;
-    address public tst;
-    address public wbtc;
-    address public paxg;
+    // Mock address:
+    // address public swapRouterMock;
+    // address public euros;
+    // address public tst;
+    // address public wbtc;
+    // address public paxg;
+
+    // onchain Address:
+    address private constant UniswapRouterV3 =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    address private constant euros = 0x643b34980E635719C15a2D4ce69571a258F940E9;
+    address private constant tst = 0xf5A27E55C748bCDdBfeA5477CB9Ae924f0f7fd2e;
+    address private constant wbtc = 0xf5A27E55C748bCDdBfeA5477CB9Ae924f0f7fd2e;
+    address private constant paxg = 0xfEb4DfC8C4Cf7Ed305bb08065D08eC6ee6728429;
+    address private constant weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
 
     address public protocol;
 
@@ -91,10 +99,24 @@ abstract contract HelperTest is Test {
     AggregatorV3InterfaceMock priceFeedwBtcUsd;
     AggregatorV3InterfaceMock priceFeedPaxgUsd;
 
-    address public chainlinkNativeUsd;
-    address public chainlinkEurUsd;
-    address public chainlinkwBtcUsd;
-    address public chainlinkPaxgUsd;
+    // Mock address:
+    // address public chainlinkNativeUsd;
+    // address public chainlinkEurUsd;
+    // address public chainlinkwBtcUsd;
+    // address public chainlinkPaxgUsd;
+
+    // Onchain oracle address on Arbitrum:
+    address private constant chainlinkNativeUsd =
+        0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612;
+
+    address private constant chainlinkEurUsd =
+        0xA14d53bC1F1c0F31B4aA3BD109344E5009051a84;
+
+    address private constant chainlinkwBtcUsd =
+        0xd0C7101eACbB49F3deCcCc166d238410D6D46d57;
+
+    address private constant chainlinkPaxgUsd =
+        0x2BA975D4D7922cD264267Af16F3bD177F206FE3c;
 
     uint256 public collateralRate = 110000; // 110%
     uint256 public mintFeeRate = 2000; // 2%;
@@ -115,9 +137,12 @@ abstract contract HelperTest is Test {
     /*********************** PROXIES *****************************/
     ProxyAdmin internal proxyAdmin;
 
+    // fork indentifier;
+    uint256 private arbitrumFork;
+
     function setUp() public virtual {
         // fork the Arbitrum one
-        vm.createSelectFork("arbitrum", 228297650);
+        arbitrumFork = vm.createSelectFork("arbitrum", 228297650);
 
         protocol = treasury;
 
@@ -126,10 +151,10 @@ abstract contract HelperTest is Test {
 
         vm.startPrank(admin);
 
-        // Deploy Collateral assets contracts //
-        tst = address(new ERC20Mock("TST", "TST", 18));
-        wbtc = address(new ERC20Mock("WBTC", "WBTC", 8));
-        paxg = address(new ERC20Mock("PAXG", "PAXG", 18));
+        // // Deploy Collateral assets contracts //
+        // tst = address(new ERC20Mock("TST", "TST", 18));
+        // wbtc = address(new ERC20Mock("WBTC", "WBTC", 8));
+        // paxg = address(new ERC20Mock("PAXG", "PAXG", 18));
 
         vm.label(tst, "TST");
         vm.label(wbtc, "WBTC");
@@ -142,16 +167,17 @@ abstract contract HelperTest is Test {
         WBTC = IERC20Mock(wbtc);
         PAXG = IERC20Mock(paxg);
 
-        weth = address(new WETH());
+        // weth = address(new WETH());
 
         // Deploy the proxy admin for all system contract
         proxyAdmin = new ProxyAdmin(address(admin));
 
+        // Uncomment for the onchain test.
         // Deploy Price Oracle contracts for assets;
-        chainlinkNativeUsd = address(new ChainlinkMockForTest("ETH / USD"));
-        chainlinkEurUsd = address(new ChainlinkMockForTest("EUR / USD"));
-        chainlinkwBtcUsd = address(new ChainlinkMockForTest("WBTC / USD"));
-        chainlinkPaxgUsd = address(new ChainlinkMockForTest("PAXG / USD"));
+        // chainlinkNativeUsd = address(new ChainlinkMockForTest("ETH / USD"));
+        // chainlinkEurUsd = address(new ChainlinkMockForTest("EUR / USD"));
+        // chainlinkwBtcUsd = address(new ChainlinkMockForTest("WBTC / USD"));
+        // chainlinkPaxgUsd = address(new ChainlinkMockForTest("PAXG / USD"));
 
         // Asign contracts to their interface
         priceFeedNativeUsd = AggregatorV3InterfaceMock(chainlinkNativeUsd);
@@ -167,9 +193,9 @@ abstract contract HelperTest is Test {
         tokenManagerContract = ITokenManager(tokenManager);
 
         // deploy SwapRouter Mock contract
-        swapRouterMock = address(new SwapRouterMock());
+        // swapRouterMock = address(new SwapRouterMock());
 
-        swapRouterMockContract = ISwapRouter(swapRouterMock);
+        // swapRouterMockContract = ISwapRouter(swapRouterMock);
 
         // deploy smartvaultdeployer.sol
         smartVaultDeployer = address(
@@ -228,7 +254,7 @@ abstract contract HelperTest is Test {
         // Deploy the EUROS conract by proxySmartVaultManager to set it ad DEFAULT_ADMIN as it the contract
         // were newMintVault is created and should grant Burner and Minter roles to new Created Vault;
         vm.startPrank(address(proxySmartVaultManager));
-        euros = address(new EUROsMock());
+        // euros = address(new EUROsMock());
         EUROs = IEUROs(euros);
         vm.stopPrank();
 
@@ -271,7 +297,7 @@ abstract contract HelperTest is Test {
         proxySmartVaultManager.setLiquidatorAddress(
             address(proxyLiquidityPoolManager)
         );
-        proxySmartVaultManager.setSwapRouter2(swapRouterMock);
+        proxySmartVaultManager.setSwapRouter2(UniswapRouterV3);
 
         proxySmartVaultIndex.setVaultManager(address(proxySmartVaultManager));
 
@@ -280,12 +306,12 @@ abstract contract HelperTest is Test {
 
     function setInitialPrice() private {
         // Advance the block timestamp by 1 day
-        vm.warp(block.timestamp + 86400); // @audit-info put this at the end of the setup in case the problem of eurocollateral isn't solved
+        // vm.warp(block.timestamp + 86400); // @audit-info put this at the end of the setup in case the problem of eurocollateral isn't solved
         // standard precision provided by price oracles like Chainlink.
-        priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
-        priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
-        priceFeedwBtcUsd.setPrice(42000 * 1e8); // $42000
-        priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
+        // priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
+        // priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
+        // priceFeedwBtcUsd.setPrice(42000 * 1e8); // $42000
+        // priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
     }
 
     // Slow Down
@@ -303,20 +329,25 @@ abstract contract HelperTest is Test {
         setInitialPrice();
     }
 
+    function test_CanSelectFork() public {
+        vm.selectFork(arbitrumFork);
+        assertEq(vm.activeFork(), arbitrumFork);
+    }
+
     ////////// Function Utilities /////////////
     function createUser(
         uint256 _id,
         uint256 _balance
     ) internal returns (address) {
-        address user = vm.addr(_id + _balance);
-        vm.label(user, "User");
+        address _vaultOwner = vm.addr(_id + _balance);
+        vm.label(_vaultOwner, "_vaultOwner");
 
-        vm.deal(user, _balance * 1e18);
-        TST.mint(user, _balance * 1e18);
-        WBTC.mint(user, _balance * 1e18);
-        PAXG.mint(user, _balance * 1e18);
+        // vm.deal(user, _balance * 1e18);
+        TST.transfer(_vaultOwner, _balance * (10 ** TST.decimals()));
+        WBTC.transfer(_vaultOwner, _balance * (10 ** WBTC.decimals()));
+        PAXG.transfer(_vaultOwner, _balance * (10 ** PAXG.decimals()));
 
-        return user;
+        return _vaultOwner;
     }
 
     function createVaultOwners(

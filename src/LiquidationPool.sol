@@ -42,7 +42,7 @@ contract LiquidationPool is ILiquidationPool {
         uint8 dec;
     }
 
-    uint256 public constant MINIMUM_DEPOSIT = 0.05e18;
+    uint256 public constant MINIMUM_DEPOSIT = 0.5e18;
 
     address[] public holders;
 

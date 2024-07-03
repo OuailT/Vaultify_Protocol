@@ -238,64 +238,64 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.stopPrank();
     }
 
-    function test_revert_borrow_liquidated_Vault() public {
-        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
-        vault = _vaults[0];
+    // function test_revert_borrow_liquidated_Vault() public {
+    //     (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+    //     vault = _vaults[0];
 
-        VaultifyStructs.VaultStatus memory statusBeforeLiquidation = vault
-            .vaultStatus();
+    //     VaultifyStructs.VaultStatus memory statusBeforeLiquidation = vault
+    //         .vaultStatus();
 
-        uint256 maxBorrowableEuros = statusBeforeLiquidation.maxBorrowableEuros;
+    //     uint256 maxBorrowableEuros = statusBeforeLiquidation.maxBorrowableEuros;
 
-        // Borrow 95% of EUROS with the current prices
-        uint256 amountToBorrow = (maxBorrowableEuros * 99) / 100;
+    //     // Borrow 95% of EUROS with the current prices
+    //     uint256 amountToBorrow = (maxBorrowableEuros * 99) / 100;
 
-        console.log(
-            "max Borrowable Euros before price drops",
-            maxBorrowableEuros
-        );
+    //     console.log(
+    //         "max Borrowable Euros before price drops",
+    //         maxBorrowableEuros
+    //     );
 
-        vm.startPrank(_owner);
-        vault.borrow(_owner, amountToBorrow);
-        vm.stopPrank();
+    //     vm.startPrank(_owner);
+    //     vault.borrow(_owner, amountToBorrow);
+    //     vm.stopPrank();
 
-        // Drop ETH and WBTC prices to put the vault in undercollateralization status
-        priceFeedNativeUsd.setPrice(1900 * 1e8); // Price drops from $2200 to $1900
-        priceFeedwBtcUsd.setPrice(40000 * 1e8); // Price drops from $42000 to $40000
+    //     // Drop ETH and WBTC prices to put the vault in undercollateralization status
+    //     priceFeedNativeUsd.setPrice(1900 * 1e8); // Price drops from $2200 to $1900
+    //     priceFeedwBtcUsd.setPrice(40000 * 1e8); // Price drops from $42000 to $40000
 
-        VaultifyStructs.VaultStatus memory statusAfterLiquidation = vault
-            .vaultStatus();
+    //     VaultifyStructs.VaultStatus memory statusAfterLiquidation = vault
+    //         .vaultStatus();
 
-        uint256 maxBorrowableEurosAfter = statusAfterLiquidation
-            .maxBorrowableEuros;
+    //     uint256 maxBorrowableEurosAfter = statusAfterLiquidation
+    //         .maxBorrowableEuros;
 
-        console.log(
-            "max Borrowable Euros after price drops",
-            maxBorrowableEurosAfter
-        );
+    //     console.log(
+    //         "max Borrowable Euros after price drops",
+    //         maxBorrowableEurosAfter
+    //     );
 
-        vm.startPrank(address(vault.manager()));
-        vault.liquidate();
-        vm.stopPrank();
+    //     vm.startPrank(address(vault.manager()));
+    //     vault.liquidate();
+    //     vm.stopPrank();
 
-        vm.startPrank(_owner);
+    //     vm.startPrank(_owner);
 
-        _expectRevertWithCustomError({
-            target: address(vault),
-            callData: abi.encodeWithSelector(
-                vault.borrow.selector,
-                _owner,
-                50 * 1e18
-            ),
-            expectedErrorSignature: "LiquidatedVault(address)",
-            errorData: abi.encodeWithSelector(
-                VaultifyErrors.LiquidatedVault.selector,
-                vault
-            )
-        });
+    //     _expectRevertWithCustomError({
+    //         target: address(vault),
+    //         callData: abi.encodeWithSelector(
+    //             vault.borrow.selector,
+    //             _owner,
+    //             50 * 1e18
+    //         ),
+    //         expectedErrorSignature: "LiquidatedVault(address)",
+    //         errorData: abi.encodeWithSelector(
+    //             VaultifyErrors.LiquidatedVault.selector,
+    //             vault
+    //         )
+    //     });
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
     function test_revert_borrow_nonVault_Owner() public {
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);

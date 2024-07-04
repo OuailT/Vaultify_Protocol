@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IWETH} from "src/interfaces/IWETH.sol";
 
 ////// Import Interfaces //////
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
@@ -19,7 +20,7 @@ import {ISmartVaultDeployer} from "src/interfaces/ISmartVaultDeployer.sol";
 import {ISmartVaultIndex} from "src/interfaces/ISmartVaultIndex.sol";
 import {IEUROs} from "src/interfaces/IEUROs.sol";
 import {AggregatorV3InterfaceMock} from "src/mocks/AggregatorV3InterfaceMock.sol";
-import {WETH} from "solmate/src/tokens/WETH.sol";
+// import {WETH} from "solmate/src/tokens/WETH.sol";
 
 ////// Import Mock Contracts //////
 import {SwapRouterMock} from "src/mocks/SwapRouterMock.sol";
@@ -74,7 +75,7 @@ abstract contract OnchainHelperTest is Test {
     IERC20Mock public TST; // Standard protocol
     IERC20Mock public WBTC;
     IERC20Mock public PAXG; // tokenized gold
-
+    IWETH public WETH;
     // Mock address:
     // address public swapRouterMock;
     // address public euros;
@@ -166,6 +167,7 @@ abstract contract OnchainHelperTest is Test {
         TST = IERC20Mock(tst);
         WBTC = IERC20Mock(wbtc);
         PAXG = IERC20Mock(paxg);
+        WETH = IWETH(weth);
 
         // weth = address(new WETH());
 
@@ -342,10 +344,12 @@ abstract contract OnchainHelperTest is Test {
         address _vaultOwner = vm.addr(_id + _balance);
         vm.label(_vaultOwner, "_vaultOwner");
 
-        // vm.deal(user, _balance * 1e18);
-        TST.transfer(_vaultOwner, _balance * (10 ** TST.decimals()));
-        WBTC.transfer(_vaultOwner, _balance * (10 ** WBTC.decimals()));
-        PAXG.transfer(_vaultOwner, _balance * (10 ** PAXG.decimals()));
+        vm.startPrank(admin);
+        // WETH.transfer(_vaultOwner, _balance * (10 ** WETH.decimals()));
+        TST.mint(_vaultOwner, _balance * (10 ** TST.decimals()));
+        WBTC.mint(_vaultOwner, _balance * (10 ** WBTC.decimals()));
+        PAXG.mint(_vaultOwner, _balance * (10 ** PAXG.decimals()));
+        vm.stopPrank();
 
         return _vaultOwner;
     }
@@ -370,8 +374,11 @@ abstract contract OnchainHelperTest is Test {
             // 2- Transfer collateral (Native, WBTC, and PAXG) to the vault
             // Transfer 10 ETH @ $2200, 1 BTC @ $42000, 10 PAXG @ $2000
             // Total initial collateral value: $84,000 or EUR76,107
-            (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
-            require(sent, "Native ETH trx failed");
+            // convert 10 WETH to ETH;
+            // WETH.deposit{value: 11 * 1e18}();
+
+            // (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
+            // require(sent, "Native ETH trx failed");
 
             //-----------------------------------------------//
             // 10 ETH in EUROs based on the current price

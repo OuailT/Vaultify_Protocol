@@ -11,7 +11,7 @@ import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import "forge-std/console.sol";
 
 // Test Smart vault swap functionality using onchain swap on Arbitrum.
-contract SmartVaultSwapTest is OnchainHelperTest, ExpectRevert {
+contract SmartVaultOnSwapTest is OnchainHelperTest, ExpectRevert {
     function setUp() public override {
         super.setUp();
         super.setUpHelper();
@@ -29,12 +29,23 @@ contract SmartVaultSwapTest is OnchainHelperTest, ExpectRevert {
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
+        // console.log("address of the vault", address(vault));
+        // console.log("address of the vault owner", _owner);
+
         console.log("Vault balance in ETH", address(vault).balance);
         console.log("Vault balance in WETH", WETH.balanceOf(address(vault)));
         console.log("Vault balance in WBTC", WBTC.balanceOf(address(vault)));
         console.log("Vault balance in PAXG", PAXG.balanceOf(address(vault)));
+        console.log("Vault balance in LNK", LINK.balanceOf(address(vault)));
 
-        // // Step 2: Swap PAXG to WBTC
+        VaultifyStructs.VaultStatus memory vaultStatus = vault.vaultStatus();
+        uint256 totalCollateralValue = vaultStatus.totalCollateralValue;
+        uint256 maxMintable = vaultStatus.maxBorrowableEuros;
+
+        console.log("total Collateral Value", totalCollateralValue);
+        console.log("max Mintable", maxMintable);
+
+        // Step 2: Swap PAXG to WBTC
         // uint256 swapAmount = 10 * 1e18;
         // uint256 swapFee = (swapAmount * proxySmartVaultManager.swapFeeRate()) /
         //     proxySmartVaultManager.HUNDRED_PRC();

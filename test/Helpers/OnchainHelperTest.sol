@@ -75,10 +75,11 @@ abstract contract OnchainHelperTest is Test {
     IERC20Mock public TST; // Standard protocol
     IERC20Mock public WBTC;
     IERC20Mock public PAXG; // tokenized gold
+    IERC20Mock public LINK;
     IWETH public WETH;
     // Mock address:
     // address public swapRouterMock;
-    // address public euros;
+    address public euros;
     // address public tst;
     // address public wbtc;
     // address public paxg;
@@ -86,11 +87,12 @@ abstract contract OnchainHelperTest is Test {
     // onchain Address:
     address private constant UniswapRouterV3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    address private constant euros = 0x643b34980E635719C15a2D4ce69571a258F940E9;
+    // address private constant euros = 0x643b34980E635719C15a2D4ce69571a258F940E9;
     address private constant tst = 0xf5A27E55C748bCDdBfeA5477CB9Ae924f0f7fd2e;
-    address private constant wbtc = 0xf5A27E55C748bCDdBfeA5477CB9Ae924f0f7fd2e;
+    address private constant wbtc = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
     address private constant paxg = 0xfEb4DfC8C4Cf7Ed305bb08065D08eC6ee6728429;
     address private constant weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address private constant link = 0xf97f4df75117a78c1A5a0DBb814Af92458539FB4;
 
     address public protocol;
 
@@ -99,6 +101,7 @@ abstract contract OnchainHelperTest is Test {
     AggregatorV3InterfaceMock priceFeedEurUsd;
     AggregatorV3InterfaceMock priceFeedwBtcUsd;
     AggregatorV3InterfaceMock priceFeedPaxgUsd;
+    AggregatorV3InterfaceMock priceFeedLinkUsd;
 
     // Mock address:
     // address public chainlinkNativeUsd;
@@ -118,6 +121,9 @@ abstract contract OnchainHelperTest is Test {
 
     address private constant chainlinkPaxgUsd =
         0x2BA975D4D7922cD264267Af16F3bD177F206FE3c;
+
+    address private constant chainlinkTokenUsd =
+        0x86E53CF1B870786351Da77A57575e79CB55812CB;
 
     uint256 public collateralRate = 110000; // 110%
     uint256 public mintFeeRate = 2000; // 2%;
@@ -161,31 +167,22 @@ abstract contract OnchainHelperTest is Test {
         vm.label(wbtc, "WBTC");
         vm.label(paxg, "PAXG");
 
-        // IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), address(vault));
-
         // Asign contracts to their interface
         TST = IERC20Mock(tst);
         WBTC = IERC20Mock(wbtc);
         PAXG = IERC20Mock(paxg);
         WETH = IWETH(weth);
-
-        // weth = address(new WETH());
+        LINK = IERC20Mock(link);
 
         // Deploy the proxy admin for all system contract
         proxyAdmin = new ProxyAdmin(address(admin));
-
-        // Uncomment for the onchain test.
-        // Deploy Price Oracle contracts for assets;
-        // chainlinkNativeUsd = address(new ChainlinkMockForTest("ETH / USD"));
-        // chainlinkEurUsd = address(new ChainlinkMockForTest("EUR / USD"));
-        // chainlinkwBtcUsd = address(new ChainlinkMockForTest("WBTC / USD"));
-        // chainlinkPaxgUsd = address(new ChainlinkMockForTest("PAXG / USD"));
 
         // Asign contracts to their interface
         priceFeedNativeUsd = AggregatorV3InterfaceMock(chainlinkNativeUsd);
         priceFeedEurUsd = AggregatorV3InterfaceMock(chainlinkEurUsd);
         priceFeedwBtcUsd = AggregatorV3InterfaceMock(chainlinkwBtcUsd);
         priceFeedPaxgUsd = AggregatorV3InterfaceMock(chainlinkPaxgUsd);
+        priceFeedLinkUsd = AggregatorV3InterfaceMock(chainlinkTokenUsd);
 
         // deploy tokenManager.sol contract
         tokenManager = address(
@@ -194,20 +191,10 @@ abstract contract OnchainHelperTest is Test {
 
         tokenManagerContract = ITokenManager(tokenManager);
 
-        // deploy SwapRouter Mock contract
-        // swapRouterMock = address(new SwapRouterMock());
-
-        // swapRouterMockContract = ISwapRouter(swapRouterMock);
-
         // deploy smartvaultdeployer.sol
         smartVaultDeployer = address(
             new SmartVaultDeployer(native, address(chainlinkEurUsd))
         );
-
-        // // deploy smartVaultIndex.sol
-        // smartVaultIndex = address(new SmartVaultIndex());
-
-        // smartVaultIndexContract = ISmartVaultIndex(smartVaultIndex);
 
         // Deploy implementation for all the system
         smartVaultManagerImplementation = address(new SmartVaultManagerMock());
@@ -253,10 +240,12 @@ abstract contract OnchainHelperTest is Test {
 
         vm.stopPrank();
 
+        // IEUROs(euros).grantRole(IEUROs(euros).MINTER_ROLE(), address(vault));
+
         // Deploy the EUROS conract by proxySmartVaultManager to set it ad DEFAULT_ADMIN as it the contract
         // were newMintVault is created and should grant Burner and Minter roles to new Created Vault;
         vm.startPrank(address(proxySmartVaultManager));
-        // euros = address(new EUROsMock());
+        euros = address(new EUROsMock());
         EUROs = IEUROs(euros);
         vm.stopPrank();
 
@@ -320,9 +309,12 @@ abstract contract OnchainHelperTest is Test {
     function setAcceptedCollateral() private {
         vm.startPrank(admin);
         console.log("euros address", proxySmartVaultManager.euros());
+        // is chainlink has ETH/USD and WETH/USD
+        // tokenManagerContract.addAcceptedToken(weth, chainlinkNativeUsd);
         // Add accepted collateral
         tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
-        tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
+        // tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
+        tokenManagerContract.addAcceptedToken(link, chainlinkTokenUsd);
         vm.stopPrank();
     }
 
@@ -337,19 +329,36 @@ abstract contract OnchainHelperTest is Test {
     }
 
     ////////// Function Utilities /////////////
-    function createUser(
+    function fundWithTokens(
         uint256 _id,
         uint256 _balance
     ) internal returns (address) {
         address _vaultOwner = vm.addr(_id + _balance);
         vm.label(_vaultOwner, "_vaultOwner");
 
-        vm.startPrank(admin);
-        // WETH.transfer(_vaultOwner, _balance * (10 ** WETH.decimals()));
-        TST.mint(_vaultOwner, _balance * (10 ** TST.decimals()));
-        WBTC.mint(_vaultOwner, _balance * (10 ** WBTC.decimals()));
-        PAXG.mint(_vaultOwner, _balance * (10 ** PAXG.decimals()));
+        // fund the the vault creator with ETH
+        vm.deal(_vaultOwner, _balance * 1e18);
+
+        // Fund the vault creator with WETH from a whale.
+        vm.startPrank(0x489ee077994B6658eAfA855C308275EAd8097C4A);
+        WETH.transfer(_vaultOwner, _balance * (10 ** WETH.decimals()));
         vm.stopPrank();
+
+        // Fund the vault creator with WBTC from a whale.
+        vm.startPrank(0x489ee077994B6658eAfA855C308275EAd8097C4A);
+        WBTC.transfer(_vaultOwner, _balance * (10 ** WBTC.decimals()));
+        vm.stopPrank();
+
+        // Fund the vault creator with WBTC from a whale.
+        vm.startPrank(0x489ee077994B6658eAfA855C308275EAd8097C4A);
+        LINK.transfer(_vaultOwner, _balance * (10 ** LINK.decimals()));
+        vm.stopPrank();
+
+        // vm.startPrank(0x694321B2f596C0610c03DEac16C7341933Aaa952);
+        // PAXG.transfer(_vaultOwner, _balance);
+        // vm.stopPrank();
+
+        // TST.transfer(_vaultOwner, _balance * (10 ** TST.decimals()));
 
         return _vaultOwner;
     }
@@ -362,12 +371,16 @@ abstract contract OnchainHelperTest is Test {
 
         for (uint256 i = 0; i < _numOfOwners; i++) {
             // create vault owners;
-            _vaultOwner = createUser(i, 100);
+            _vaultOwner = fundWithTokens(i, 100);
             vm.startPrank(_vaultOwner);
+
+            console.log("address of the vault owner", _vaultOwner);
 
             // 1- Mint a vault
             (uint256 tokenId, address vaultAddr) = proxySmartVaultManager
                 .mintNewVault();
+
+            // console.log("address of the vault", address(vault));
 
             vault = ISmartVault(vaultAddr);
 
@@ -377,30 +390,29 @@ abstract contract OnchainHelperTest is Test {
             // convert 10 WETH to ETH;
             // WETH.deposit{value: 11 * 1e18}();
 
-            // (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
-            // require(sent, "Native ETH trx failed");
+            (bool sent, ) = payable(vaultAddr).call{value: 10 * 1e18}("");
+            require(sent, "Native ETH trx failed");
 
             //-----------------------------------------------//
             // 10 ETH in EUROs based on the current price
             // 10 * 2200 / (1.1037) EUR/USD exchange rate =  10 ETH  == 19931.56 EUR; [x] correct
             //-----------------------------------------------//
             // 1 WBTC * 42000 / (1.1037) EUR/USD exchange rate = 1 WTBC == 38052.87 EUR [x] correct
-            WBTC.transfer(vaultAddr, 1 * 1e8);
-            //-----------------------------------------------//
-            PAXG.transfer(vaultAddr, 10 * 1e18);
+            WBTC.transfer(vaultAddr, 1);
+            // //-----------------------------------------------//
+            // PAXG.transfer(vaultAddr, 10);
             // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
 
-            // ISwapRouter.MockSwapData memory swapData = SwapRouterMock(
-            //     proxySmartVaultManager.swapRouter2()
-            // ).receivedSwap();
-
+            WETH.transfer(vaultAddr, 10);
             // assertEq(swapData.tokenIn, address(WBTC), "TokenIn should be WBTC");
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188
-
+            LINK.transfer(vaultAddr, 10);
             // mint/borrow Euros from the vault
             // Vault borrower can borrow up to // 69,188 EUR || 80%
             // vault.borrowMint(_vaultOwner, 50_350 * 1e18);
+
+            // @audit add PAXG to accepted token list to be able to calculate their prices.
 
             vm.stopPrank();
 

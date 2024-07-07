@@ -50,6 +50,7 @@ abstract contract OnchainHelperTest is Test {
     ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
     ILiquidationPool public liquidationPoolContract;
+    ISmartVaultDeployer public smartVaultDeployerContract;
 
     ITokenManager public tokenManagerContract;
     ISmartVaultIndex public smartVaultIndexContract;
@@ -69,6 +70,8 @@ abstract contract OnchainHelperTest is Test {
     address public tokenManager;
     // address public smartVaultIndex;
     address public smartVaultDeployer;
+
+    address public calculator;
 
     // Assets Interfaces
     IEUROs public EUROs;
@@ -310,7 +313,7 @@ abstract contract OnchainHelperTest is Test {
         vm.startPrank(admin);
         console.log("euros address", proxySmartVaultManager.euros());
         // is chainlink has ETH/USD and WETH/USD
-        // tokenManagerContract.addAcceptedToken(weth, chainlinkNativeUsd);
+        tokenManagerContract.addAcceptedToken(weth, chainlinkNativeUsd);
         // Add accepted collateral
         tokenManagerContract.addAcceptedToken(wbtc, chainlinkwBtcUsd);
         // tokenManagerContract.addAcceptedToken(paxg, chainlinkPaxgUsd);
@@ -349,10 +352,10 @@ abstract contract OnchainHelperTest is Test {
         WBTC.transfer(_vaultOwner, _balance * (10 ** WBTC.decimals()));
         vm.stopPrank();
 
-        // Fund the vault creator with WBTC from a whale.
-        vm.startPrank(0x489ee077994B6658eAfA855C308275EAd8097C4A);
-        LINK.transfer(_vaultOwner, _balance * (10 ** LINK.decimals()));
-        vm.stopPrank();
+        // // Fund the vault creator with WBTC from a whale.
+        // vm.startPrank(0x489ee077994B6658eAfA855C308275EAd8097C4A);
+        // LINK.transfer(_vaultOwner, _balance * (10 ** LINK.decimals()));
+        // vm.stopPrank();
 
         // vm.startPrank(0x694321B2f596C0610c03DEac16C7341933Aaa952);
         // PAXG.transfer(_vaultOwner, _balance);
@@ -398,16 +401,16 @@ abstract contract OnchainHelperTest is Test {
             // 10 * 2200 / (1.1037) EUR/USD exchange rate =  10 ETH  == 19931.56 EUR; [x] correct
             //-----------------------------------------------//
             // 1 WBTC * 42000 / (1.1037) EUR/USD exchange rate = 1 WTBC == 38052.87 EUR [x] correct
-            WBTC.transfer(vaultAddr, 1);
+            WBTC.transfer(vaultAddr, 1 * (10 ** WBTC.decimals()));
+
             // //-----------------------------------------------//
             // PAXG.transfer(vaultAddr, 10);
             // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
 
-            WETH.transfer(vaultAddr, 10);
+            WETH.transfer(vaultAddr, 10 * (10 ** WETH.decimals()));
             // assertEq(swapData.tokenIn, address(WBTC), "TokenIn should be WBTC");
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188
-            LINK.transfer(vaultAddr, 10);
             // mint/borrow Euros from the vault
             // Vault borrower can borrow up to // 69,188 EUR || 80%
             // vault.borrowMint(_vaultOwner, 50_350 * 1e18);

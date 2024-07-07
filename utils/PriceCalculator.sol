@@ -86,6 +86,7 @@ contract PriceCalculator is IPriceCalculator {
 
         // Calculates the collateral value in USD
         // uint256 collateralUSD = collateralScaled * getPriceAvg(tokenUsdFeed, 4);
+
         uint256 collateralUSD = collateralScaled * uint256(tokenUsdPrice);
 
         // retrives the price of euroUSD

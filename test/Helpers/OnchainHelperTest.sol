@@ -407,7 +407,7 @@ abstract contract OnchainHelperTest is Test {
             // PAXG.transfer(vaultAddr, 10);
             // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
 
-            WETH.transfer(vaultAddr, 10 * (10 ** WETH.decimals()));
+            // WETH.transfer(vaultAddr, 10 * (10 ** WETH.decimals()));
             // assertEq(swapData.tokenIn, address(WBTC), "TokenIn should be WBTC");
             // Max mintable = euroCollateral() * HUNDRED_PC / collateralRate
             // Max mintable = 76,107 * 100000/110000 = 69,188

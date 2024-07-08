@@ -23,8 +23,14 @@ interface ISmartVault {
         bytes32 _outTokenSymbol,
         uint256 _amount,
         uint24 _fee,
-        uint256 _minAmountOut
+        uint256 _requestedMinOut
     ) external;
+
+    function calculateMinimimAmountOut(
+        bytes32 _inTokenSymbol,
+        bytes32 _outTokenSymbol,
+        uint256 _amount
+    ) external view returns (uint256);
 
     function removeNativeCollateral(
         uint256 _amount,

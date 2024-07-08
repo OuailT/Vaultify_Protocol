@@ -117,15 +117,13 @@ contract SmartVault is ISmartVault {
      * @param _inTokenSymbol The symbol of the input token.
      * @param _outTokenSymbol The symbol of the output token.
      * @param _amount The amount of the input token.
-     * @param _minAmountOut The minimum amount of the output token expected by the user.
-     * @return The minimum amount of the output token required.
+     * @return The minimum amount of the output token required
      */
     function calculateMinimimAmountOut(
         bytes32 _inTokenSymbol,
         bytes32 _outTokenSymbol,
-        uint256 _amount,
-        uint256 _minAmountOut
-    ) private view returns (uint256) {
+        uint256 _amount
+    ) public view returns (uint256) {
         // The percentage of minted token(borrowed token) that must be backed by collateral
         // to keep vault collatalized
         uint256 requiredCollateralValue = (borrowedEuros *
@@ -142,7 +140,7 @@ contract SmartVault is ISmartVault {
         // else: The Vault/contract must receive from the swap at least a minimumOut to keep vault collateralized.
         return
             collateralValueMinusSwapValue >= requiredCollateralValue
-                ? _minAmountOut
+                ? 0
                 : calculator.euroToToken(
                     getToken(_outTokenSymbol),
                     requiredCollateralValue - collateralValueMinusSwapValue
@@ -553,7 +551,7 @@ contract SmartVault is ISmartVault {
      * @param _inTokenSymbol The symbol of the input token.
      * @param _outTokenSymbol The symbol of the output token.
      * @param _amount The amount of the input token to swap.
-     * @param _minAmountOut The minimum amount out expected from the swap.
+     * @param _requestedMinOut The minimum amount out expected from the swap.
      */
     // TODO: Add dynamic price in the excuteSingle function in SwapRouterMock using the calculator
     // to mock a swap.
@@ -562,7 +560,7 @@ contract SmartVault is ISmartVault {
         bytes32 _outTokenSymbol,
         uint256 _amount,
         uint24 _fee,
-        uint256 _minAmountOut
+        uint256 _requestedMinOut
     ) external onlyVaultOwner {
         // Calculate the fee swap
         uint256 swapFee = (_amount * smartVaultManager.swapFeeRate()) /
@@ -575,9 +573,11 @@ contract SmartVault is ISmartVault {
         uint256 minimumAmountOut = calculateMinimimAmountOut(
             _inTokenSymbol,
             _outTokenSymbol,
-            _amount,
-            _minAmountOut
+            _amount
         );
+
+        if (_requestedMinOut > minimumAmountOut)
+            minimumAmountOut = _requestedMinOut;
 
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({

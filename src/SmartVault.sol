@@ -134,10 +134,6 @@ contract SmartVault is ISmartVault {
         uint256 collateralValueMinusSwapValue = totalCollateralInEuros() -
             calculator.tokenToEuroAvg(getToken(_inTokenSymbol), _amount);
 
-        // 10 PAXG =>
-        // Before swap make sure that the vault remains collateralized after swap:
-        // If collateralValueMinusSwapValue >= requiredCollateralValue = Vault/address(this) remain collateralized after receiving tokenOut.
-        // else: The Vault/contract must receive from the swap at least a minimumOut to keep vault collateralized.
         return
             collateralValueMinusSwapValue >= requiredCollateralValue
                 ? 0
@@ -576,8 +572,11 @@ contract SmartVault is ISmartVault {
             _amount
         );
 
-        if (_requestedMinOut > minimumAmountOut)
-            minimumAmountOut = _requestedMinOut;
+        // Ensure we use the higher of the two values to make sure that
+        // the vault still collateralized after the swap and the user protected again high slippage.
+        uint256 effectiveMinimumOut = _requestedMinOut > minimumAmountOut
+            ? _requestedMinOut
+            : minimumAmountOut;
 
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
@@ -587,7 +586,7 @@ contract SmartVault is ISmartVault {
                 recipient: address(this),
                 deadline: block.timestamp + 60, // 1 minute from now
                 amountIn: _amount - swapFee,
-                amountOutMinimum: minimumAmountOut,
+                amountOutMinimum: effectiveMinimumOut,
                 sqrtPriceLimitX96: 0
             });
 

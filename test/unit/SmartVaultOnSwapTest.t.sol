@@ -142,8 +142,4 @@ contract SmartVaultOnSwapTest is OnchainHelperTest, ExpectRevert {
         vm.stopPrank();
         console.log("Swap after borrowing and repaying completed successfully");
     }
-
-    // [] test off chain the case were the the user tried to swap more than they could
-    // and check if te user will get the minAmountOut that set by him or not.
-    // also consider the new conditions added in the function swap.
 }

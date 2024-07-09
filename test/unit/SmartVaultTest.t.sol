@@ -923,93 +923,81 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.stopPrank();
     }
 
-    // function test_SwapMoreThanAllowed() public {
-    //     console.log("Testing swap of more than allowed amount");
+    function test_SwapMoreThanAllowed() public {
+        console.log("Testing swap of more than allowed amount");
 
-    //     // Step 1: Mint a vault and transfer collateral
-    //     ISmartVault[] memory _vaults = new ISmartVault[](1);
-    //     (_vaults, _owner) = createVaultOwners(1);
-    //     vault = _vaults[0];
+        // Step 1: Mint a vault and transfer collateral
+        (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
+        vault = _vaults[0];
 
-    //     // Step 2: Get vault status and calculate maxMintable
-    //     VaultifyStructs.VaultStatus memory vaultStatus = vault.vaultStatus();
-    //     uint256 totalCollateralValue = vaultStatus.totalCollateralValue;
-    //     uint256 maxMintable = vaultStatus.maxBorrowableEuros;
+        // Step 2: Get vault status and calculate maxMintable
+        VaultifyStructs.VaultStatus memory vaultStatus = vault.vaultStatus();
+        uint256 totalCollateralValue = vaultStatus.totalCollateralValue;
+        uint256 maxMintable = vaultStatus.maxBorrowableEuros;
 
-    //     console.log("Euro Collateral:", totalCollateralValue);
-    //     console.log("Max Mintable Euros:", maxMintable);
+        console.log("Euro Collateral:", totalCollateralValue);
+        console.log("Max Mintable Euros:", maxMintable);
 
-    //     // Step 3: Mint/borrow 80% of maxMintable
-    //     uint256 mintAmount = (maxMintable * 80) / 100;
-    //     vm.prank(_owner);
-    //     vault.borrow(_owner, mintAmount);
+        vm.startPrank(_owner);
+        // Step 3: Borrow EUROs to bring the vault close to its collateralization limit
+        uint256 mintAmount = (maxMintable * 90) / 100;
+        vault.borrow(_owner, mintAmount);
 
-    //     // Step 4: Attempt to swap more than 12% of collateral (let's try 15%)
-    //     uint256 swapAmount = (totalCollateralValue * 15) / 100;
-    //     uint256 swapAmountInETH = (swapAmount * 1e18) / 2200; // Convert EUR to ETH
+        // Step 3: Attempt to swap all ETH collateral
+        uint256 swapAmount = 10 ether;
+        bytes32 inTokenSymbol = bytes32("ETH");
+        bytes32 outTokenSymbol = bytes32("WBTC");
 
-    //     // Get the actual ETH balance of the vault
-    //     uint256 vaultETHBalance = address(vault).balance;
+        uint256 minimumAmountOut = vault.calculateMinimimAmountOut(
+            inTokenSymbol,
+            outTokenSymbol,
+            swapAmount
+        );
 
-    //     // Use the minimum of swapAmountInETH and vaultETHBalance
-    //     uint256 actualSwapAmount = swapAmountInETH < vaultETHBalance
-    //         ? swapAmountInETH
-    //         : vaultETHBalance;
+        // Step 4: Verify that the minimumAmountOut is non-zero
+        assertGt(minimumAmountOut, 0, "Minimum amount out should be non-zero");
 
-    //     uint256 minAmountOut = 0; // Set to 0 for this test
-    //     uint24 poolFee = 500; // 0.5% pool fee in basis points
-    //     uint256 swapFee = (actualSwapAmount *
-    //         proxySmartVaultManager.swapFeeRate()) /
-    //         proxySmartVaultManager.HUNDRED_PRC();
+        console.log("minAmountOut", minimumAmountOut);
+        uint256 requestedMinOut = minimumAmountOut + 1;
 
-    //     console.log("Attempting to swap ETH amount:", actualSwapAmount);
+        // Step 5: Attempt the actual swap
+        vault.swap(
+            inTokenSymbol,
+            outTokenSymbol,
+            swapAmount,
+            3000, // 0.3% fee
+            requestedMinOut
+        );
 
-    //     vm.prank(_owner);
-    //     vault.swap(
-    //         bytes32("ETH"),
-    //         bytes32("WBTC"),
-    //         actualSwapAmount,
-    //         poolFee,
-    //         minAmountOut
-    //     );
+        // Step 6: Verify the MockSwapData
+        ISwapRouter.MockSwapData memory swapData = swapRouterMockContract
+            .receivedSwap();
 
-    //     // Step 5: Verify the swap results
-    //     ISwapRouter.MockSwapData memory swapData = swapRouterMockContract
-    //         .receivedSwap();
+        assertEq(
+            swapData.tokenIn,
+            address(proxySmartVaultManager.weth()),
+            "Incorrect tokenIn"
+        );
+        assertEq(swapData.tokenOut, address(WBTC), "Incorrect tokenOut");
+        assertEq(swapData.fee, 3000, "Incorrect fee");
+        assertEq(swapData.recipient, address(vault), "Incorrect recipient");
+        assertEq(
+            swapData.amountIn,
+            swapAmount -
+                (swapAmount * proxySmartVaultManager.swapFeeRate()) /
+                proxySmartVaultManager.HUNDRED_PRC(),
+            "Incorrect amountIn"
+        );
+        assertEq(
+            swapData.amountOutMinimum,
+            requestedMinOut,
+            "Incorrect amountOutMinimum"
+        );
+        assertEq(swapData.sqrtPriceLimitX96, 0, "Incorrect sqrtPriceLimitX96");
 
-    //     // Checks if a is less than b
-    //     // The actual swapped amount should be less than the requested amount
-    //     assertLt(
-    //         swapData.amountOutMinimum,
-    //         actualSwapAmount - fee,
-    //         "amountOutMinimum amount should be less than requested amount to swap"
-    //     );
-
-    //     // Step 6: Get updated vault status
-    //     vaultStatus = vault.vaultStatus();
-    //     uint256 newTotalCollateralValue = vaultStatus.totalCollateralValue;
-    //     uint256 mintedEuros = vaultStatus.borrowedAmount;
-
-    //     // Verify that the vault remains collateralized
-    //     uint256 requiredCollateralValue = (mintedEuros *
-    //         proxySmartVaultManager.collateralRate()) /
-    //         proxySmartVaultManager.HUNDRED_PRC();
-
-    //     // // greater than or equal to
-    //     // assertGe(
-    //     //     newTotalCollateralValue,
-    //     //     requiredCollateralValue,
-    //     //     "Vault should remain collateralized"
-    //     // );
-
-    //     console.log("New Euro Collateral:", newTotalCollateralValue / 1e18);
-    //     console.log(
-    //         "required Collateral Value:",
-    //         requiredCollateralValue / 1e18
-    //     );
-    //     console.log("Minted Euros:", mintedEuros);
-    //     console.log("Swap of more than allowed amount handled correctly");
-    // }
+        vm.stopPrank();
+        console.log("Swap of more than allowed amount handled correctly");
+    }
 
     function test_RemoveNativeCollateral_Successful() public {
         console.log("Testing successful removal of native collateral");

@@ -346,11 +346,16 @@ abstract contract HelperTest is Test {
             // 10 ETH in EUROs based on the current price
             // 10 * 2200 / (1.1037) EUR/USD exchange rate =  10 ETH  == 19931.56 EUR; [x] correct
             //-----------------------------------------------//
+
+            //-----------------------------------------------//
             // 1 WBTC * 42000 / (1.1037) EUR/USD exchange rate = 1 WTBC == 38052.87 EUR [x] correct
             WBTC.transfer(vaultAddr, 1 * 1e8);
             //-----------------------------------------------//
+
+            //-----------------------------------------------//
             PAXG.transfer(vaultAddr, 10 * 1e18);
             // 10 PAXG * $2000 / (1.1037) EUR/USD exchange rate =10 PAXG == 18119.60 EUR [x] correct
+            //-----------------------------------------------//
 
             // ISwapRouter.MockSwapData memory swapData = SwapRouterMock(
             //     proxySmartVaultManager.swapRouter2()

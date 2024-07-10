@@ -14,7 +14,9 @@ import {VaultifyErrors} from "./libraries/VaultifyErrors.sol";
 import {VaultifyEvents} from "./libraries/VaultifyEvents.sol";
 import {VaultifyStructs} from "./libraries/VaultifyStructs.sol";
 
-// Add Event for important task
+// @audit IF THE CONTRACT IS NOT PAUSED
+/// @title LiquidationPool Contract
+/// @notice This contract manages liquidated assets and distributing them to stakestakers
 contract LiquidationPool is ILiquidationPool {
     using SafeERC20 for IERC20;
 
@@ -22,44 +24,57 @@ contract LiquidationPool is ILiquidationPool {
     address private immutable EUROs;
     address private immutable eurUsd;
 
-    // struct
+    /// @notice Represents a user's position in the liquidation pool
     struct Position {
-        address holder;
-        uint256 tstTokens;
-        uint256 eurosTokens;
+        /// @notice The Ethereum address of the staker
+        address stakerAddress;
+        /// @notice The amount of TST tokens staked
+        uint256 stakedTstAmount;
+        /// @notice The amount of EUROs tokens staked
+        uint256 stakedEurosAmount;
     }
 
+    /// @notice Represents a pending stake that hasn't been added to the main position yet
     struct PendingStake {
-        address holder;
+        /// @notice The Ethereum address of the staker
+        address stakerAddress;
+        /// @notice The Unix timestamp when this pending stake was created
         uint256 createdAt;
-        uint256 tstTokens;
-        uint256 eurosTokens;
+        /// @notice The amount of TST tokens in this pending stake
+        uint256 pendingTstAmount;
+        /// @notice The amount of EUROs tokens in this pending stake
+        uint256 pendingEurosAmount;
     }
 
-    struct Rewards {
-        bytes32 symbol;
-        uint256 amount;
-        uint8 dec;
+    /// @notice Represents rewards earned by a user in the liquidation pool
+    struct Reward {
+        /// @notice The symbol of the reward token (e.g., "ETH", "USDC")
+        bytes32 tokenSymbol;
+        /// @notice The amount of rewards earned
+        uint256 rewardAmount;
+        /// @notice The number of decimal places for the reward token
+        uint8 tokenDecimals;
     }
 
     uint256 public constant MINIMUM_DEPOSIT = 0.5e18;
 
-    address[] public holders;
+    address[] public stakers;
 
     // PendingStake[] private pendingStakes;
     address payable public poolManager;
     address public tokenManager;
+    bool public isEmergencyActive;
 
     mapping(address => Position) private positions;
     mapping(bytes => uint256) private rewards;
-    mapping(address => PendingStake) private aggregatedPendingStakes;
-    mapping(address => uint256) private holdersIndex;
+    mapping(address => PendingStake) private pendingStakes;
+    mapping(address => uint256) private stakersIndex;
 
-    /// @notice Initializes the Liquidation Pool.
-    /// @param _TST Address of the TST token contract.
-    /// @param _EUROs Address of the EUROs token contract.
-    /// @param _eurUsd Address of the EUR/USD price feed contract.
-    /// @param _tokenManager Address of the Token Manager contract.
+    /// @notice Initializes the Liquidation Pool
+    /// @param _TST Address of the TST token contract
+    /// @param _EUROs Address of the EUROs token contract
+    /// @param _eurUsd Address of the EUR/USD price feed contract
+    /// @param _tokenManager Address of the Token Manager contract
     constructor(
         address _TST,
         address _EUROs,
@@ -79,9 +94,15 @@ contract LiquidationPool is ILiquidationPool {
         _;
     }
 
-    // TODO Change tokens other tokens names
-    // TODO ADD Minimum amount to add to the pool as well as to the smartVaut to encourage liquidator
-    // to liquidate Smartvault.
+    modifier onlyDuringEmergency() {
+        if (!isEmergencyActive) revert VaultifyErrors.EmergencyStateNotActive();
+        _;
+    }
+
+    /// @notice Increases a user's position in the liquidity pool
+    /// @dev Allows users to deposit TST and EUROs tokens into the pool
+    /// @param _tstVal The amount of TST tokens to deposit
+    /// @param _eurosVal The amount of EUROs tokens to deposit
     function increasePosition(uint256 _tstVal, uint256 _eurosVal) external {
         require(
             _tstVal >= MINIMUM_DEPOSIT || _eurosVal >= MINIMUM_DEPOSIT,
@@ -100,8 +121,8 @@ contract LiquidationPool is ILiquidationPool {
         if (!isEurosApproved) revert VaultifyErrors.NotEnoughEurosAllowance();
         if (!isTstApproved) revert VaultifyErrors.NotEnoughTstAllowance();
 
-        consolidatePendingStakes(); // [x] TODO
-        ILiquidationPoolManager(poolManager).distributeFees(); // [x] TODO
+        consolidatePendingStakes();
+        ILiquidationPoolManager(poolManager).distributeFees();
 
         if (_tstVal > 0) {
             IERC20(TST).safeTransferFrom(msg.sender, address(this), _tstVal);
@@ -116,19 +137,19 @@ contract LiquidationPool is ILiquidationPool {
         }
 
         // READ FROM THE STORAGE ONCE
-        PendingStake storage stake = aggregatedPendingStakes[msg.sender];
+        PendingStake storage stake = pendingStakes[msg.sender];
 
         PendingStake memory updatePendingStake = PendingStake({
-            holder: msg.sender,
+            stakerAddress: msg.sender,
             createdAt: block.timestamp,
-            tstTokens: stake.tstTokens + _tstVal,
-            eurosTokens: stake.eurosTokens + _eurosVal
+            pendingTstAmount: stake.pendingTstAmount + _tstVal,
+            pendingEurosAmount: stake.pendingEurosAmount + _eurosVal
         });
 
-        aggregatedPendingStakes[msg.sender] = updatePendingStake;
+        pendingStakes[msg.sender] = updatePendingStake;
 
-        // Add the staker/holder as unique to avoid duplicate address
-        addUniqueHolder(msg.sender); // TODO
+        // Add the staker/stakerAddress as unique to avoid duplicate address
+        addUniqueStaker(msg.sender); // TODO
 
         emit VaultifyEvents.PositionIncreased(
             msg.sender,
@@ -138,16 +159,19 @@ contract LiquidationPool is ILiquidationPool {
         );
     }
 
-    // decrease position function
+    /// @notice Decreases a user's position in the liquidity pool
+    /// @dev Allows users to withdraw TST and EUROs tokens from the pool
+    /// @param _tstVal The amount of TST tokens to withdraw
+    /// @param _eurosVal The amount of EUROs tokens to withdraw
     function decreasePosition(uint256 _tstVal, uint256 _eurosVal) external {
         // READ from memory
-        Position memory _userPosition = positions[msg.sender];
+        Position memory _stakerPosition = positions[msg.sender];
 
         // Check if the user has enough tst or Euros tokens to remove from it position
 
         if (
-            _userPosition.tstTokens < _tstVal &&
-            _userPosition.eurosTokens < _eurosVal
+            _stakerPosition.stakedTstAmount < _tstVal &&
+            _stakerPosition.stakedEurosAmount < _eurosVal
         ) revert VaultifyErrors.InvalidDecrementAmount();
 
         consolidatePendingStakes();
@@ -156,112 +180,138 @@ contract LiquidationPool is ILiquidationPool {
         if (_tstVal > 0) {
             IERC20(TST).safeTransfer(msg.sender, _tstVal);
             unchecked {
-                _userPosition.tstTokens -= _tstVal;
+                _stakerPosition.stakedTstAmount -= _tstVal;
             }
         }
 
         if (_eurosVal > 0) {
             IERC20(EUROs).safeTransfer(msg.sender, _eurosVal);
             unchecked {
-                _userPosition.eurosTokens -= _eurosVal;
+                _stakerPosition.stakedEurosAmount -= _eurosVal;
             }
         }
 
         // create function to check if the positon is Empty
-        if (_userPosition.tstTokens == 0 && _userPosition.eurosTokens == 0) {
-            deletePosition(_userPosition.holder);
+        if (
+            _stakerPosition.stakedTstAmount == 0 &&
+            _stakerPosition.stakedEurosAmount == 0
+        ) {
+            deletePosition(_stakerPosition.stakerAddress);
         }
 
         emit VaultifyEvents.positionDecreased(msg.sender, _tstVal, _eurosVal);
     }
 
-    // delete Positions and holders
-    function deletePosition(address _holder) private {
-        // delete holder
-        deleteHolder(_holder);
-        delete positions[_holder];
+    /// @notice Deletes a staker's position from the pool
+    /// @dev This function is called when a staker's position becomes empty
+    /// @param _staker The address of the staker whose position is to be deleted
+    function deletePosition(address _staker) private {
+        // delete staker
+        deleteStaker(_staker);
+        delete positions[_staker];
     }
 
-    function addUniqueHolder(address _holder) private {
-        if (holdersIndex[_holder] == 0) {
-            holders.push(_holder);
-            // Store the index of the new holder, which is length of the array - 1(index start at 0)
-            holdersIndex[_holder] = holders.length - 1;
+    /// @notice Adds a new unique staker to the pool
+    /// @dev This function ensures that each staker is only added once to the holders array
+    /// @param _staker The address of the new staker to be added
+    function addUniqueStaker(address _staker) private {
+        if (stakersIndex[_staker] == 0) {
+            stakers.push(_staker);
+            // Store the index of the new staker, which is length of the array - 1(index start at 0)
+            stakersIndex[_staker] = stakers.length - 1;
         } else {
             return;
         }
     }
 
-    function deleteHolder(address _holder) private {
-        uint256 index = holdersIndex[_holder];
-        if (index != 0 || holders[0] == _holder) {
-            // Replace the holder that we want to delete with the last holder in the array holder
-            // @audit this will never be able to target the first holder 0
-            holders[index] = holders[holders.length - 1];
+    /// @notice Removes a staker from the pool
+    /// @dev This function is called when a staker's position is fully withdrawn
+    /// @param _staker The address of the staker to be removed
+    function deleteStaker(address _staker) private {
+        uint256 index = stakersIndex[_staker];
+        if (index != 0 || stakers[0] == _staker) {
+            // Replace the staker that we want to delete with the last staker in the array staker
+            // @audit this will never be able to target the first staker 0
+            stakers[index] = stakers[stakers.length - 1];
 
-            // set the index of the desired removed element to last holder in the array
-            holdersIndex[holders[holders.length - 1]] = index;
+            // set the index of the desired removed element to last staker in the array
+            stakersIndex[stakers[stakers.length - 1]] = index;
 
             // Remove the last element
-            holders.pop();
+            stakers.pop();
 
-            delete holdersIndex[_holder];
+            delete stakersIndex[_staker];
         }
     }
 
-    // function that allows pending stakes position to be consolidatin as position in the pool
+    /// @notice Consolidates pending stakes into active positions
+    /// @dev This function is called internally to process pending stakes that are older than 24 hours
+    /// @dev It helps prevent front-running attacks and ensures fair reward distribution
     function consolidatePendingStakes() private {
         // Create a dealine variable to check the validity of the order
         uint256 deadline = block.timestamp - 1 days;
 
-        for (uint256 i = 0; i < holders.length; i++) {
-            address holder = holders[i];
+        for (uint256 i = 0; i < stakers.length; i++) {
+            address stakerAddress = stakers[i];
 
             // State changing operation
-            PendingStake storage _pendingStake = aggregatedPendingStakes[
-                holder
-            ];
+            PendingStake storage _pendingStake = pendingStakes[stakerAddress];
 
-            // @audit-issue Check if holder == _pending.holder to avoid storage collision.
+            // @audit-issue Check if stakerAddress == _pending.stakerAddress to avoid storage collision.
             // This is done to reduce MEV opportunities(wait at least 24H to increase position)
             // To prevent front-runing attacks to take advantage of rewards
             if (_pendingStake.createdAt < deadline) {
                 // READ from STORAGE once
-                Position storage _position = positions[_pendingStake.holder];
+                Position storage _position = positions[
+                    _pendingStake.stakerAddress
+                ];
 
                 // update Changes in memory first
                 Position memory updatePosition = Position({
-                    holder: _pendingStake.holder,
-                    tstTokens: _position.tstTokens + _pendingStake.tstTokens,
-                    eurosTokens: _position.eurosTokens +
-                        _pendingStake.eurosTokens
+                    stakerAddress: _pendingStake.stakerAddress,
+                    stakedTstAmount: _position.stakedTstAmount +
+                        _pendingStake.pendingTstAmount,
+                    stakedEurosAmount: _position.stakedEurosAmount +
+                        _pendingStake.pendingEurosAmount
                 });
 
                 // WRITE TO STORAGE ONCE
-                positions[_pendingStake.holder] = updatePosition;
+                positions[_pendingStake.stakerAddress] = updatePosition;
 
                 // Reset the pending stake
-                delete aggregatedPendingStakes[holder];
+                delete pendingStakes[stakerAddress];
             }
         }
     }
 
+    /// @notice Calculates the minimum stake amount for a given position
+    /// @dev Returns the smaller of TST or EUROs amounts in the position
+    /// @param _position The position to evaluate
+    /// @return The minimum stake amount
     function getMinimumStakeAmount(
         Position memory _position
     ) private pure returns (uint256) {
         return
-            _position.tstTokens > _position.eurosTokens
-                ? _position.eurosTokens
-                : _position.tstTokens;
+            _position.stakedTstAmount > _position.stakedEurosAmount
+                ? _position.stakedEurosAmount
+                : _position.stakedTstAmount;
     }
 
+    /// @notice Calculates the total stakes in the pool
+    /// @dev Sums up the minimum stake amounts across all positions
+    /// @return _stake The total stake amount in the pool
     function getTotalStakes() private view returns (uint256 _stake) {
-        for (uint256 i = 0; i < holders.length; i++) {
-            Position memory _position = positions[holders[i]];
+        for (uint256 i = 0; i < stakers.length; i++) {
+            Position memory _position = positions[stakers[i]];
             _stake += getMinimumStakeAmount(_position);
         }
     }
 
+    /// @notice Distributes liquidated assets to pool participants
+    /// @dev Called when assets are liquidated, distributes them among stakers
+    /// @param _assets Array of liquidated assets to distribute
+    /// @param _collateralRate The collateral rate used for calculations
+    /// @param _hundredPRC Constant representing 100% (used for percentage calculations)
     function distributeLiquatedAssets(
         VaultifyStructs.Asset[] memory _assets,
         uint256 _collateralRate,
@@ -285,12 +335,12 @@ contract LiquidationPool is ILiquidationPool {
         uint256 nativePurchased;
 
         // NOTE To do later change forloop to avoid out of gas
-        // iterates over each holder in the holders array and retrieves their position
-        for (uint256 j = 0; j < holders.length; j++) {
-            // READ get holder position
-            Position memory _position = positions[holders[j]];
+        // iterates over each stakerAddress in the stakers array and retrieves their position
+        for (uint256 j = 0; j < stakers.length; j++) {
+            // READ get stakerAddress position
+            Position memory _position = positions[stakers[j]];
 
-            // get holder stake Amount
+            // get stakerAddress stake Amount
             uint256 _stakedAmount = getMinimumStakeAmount(_position);
 
             if (_stakedAmount > 0) {
@@ -304,9 +354,9 @@ contract LiquidationPool is ILiquidationPool {
                             asset.token.clAddr
                         ).latestRoundData();
 
-                        // Calculate the portion/share of the holder in speicific amount of liquidated token from the vault
+                        // Calculate the portion/share of the stakerAddress in speicific amount of liquidated token from the vault
                         // based on the avaible amount of liquidated tokens * amountUsersStake / totalStakedAmountInPool;
-                        // calculates the holder's portion of the asset based on their stake
+                        // calculates the stakerAddress's portion of the asset based on their stake
                         uint256 _portion = (asset.amount * _stakedAmount) /
                             stakeTotal;
 
@@ -320,21 +370,21 @@ contract LiquidationPool is ILiquidationPool {
                         ///TODO  Ask AI how can I think like or how can I develop this mathematical mindset as DeFi developer.
                         // Ask for resources.
 
-                        if (costInEuros > _position.eurosTokens) {
+                        if (costInEuros > _position.stakedEurosAmount) {
                             // adjusts the portion to be proportional to the available EUROs
                             _portion =
-                                (_portion * _position.eurosTokens) /
+                                (_portion * _position.stakedEurosAmount) /
                                 costInEuros;
 
-                            costInEuros = _position.eurosTokens;
+                            costInEuros = _position.stakedEurosAmount;
                         }
 
-                        _position.eurosTokens -= costInEuros;
+                        _position.stakedEurosAmount -= costInEuros;
 
                         // add the rewards to an already exisiting rewards if any
                         rewards[
                             abi.encodePacked(
-                                _position.holder,
+                                _position.stakerAddress,
                                 asset.token.symbol
                             )
                         ] += _portion;
@@ -357,7 +407,7 @@ contract LiquidationPool is ILiquidationPool {
                 }
             }
             // WRITE
-            positions[holders[j]] = _position;
+            positions[stakers[j]] = _position;
         }
 
         // Burn EUROS tokens to keep the value of the token and control tokens circulation/supply.
@@ -368,6 +418,10 @@ contract LiquidationPool is ILiquidationPool {
     }
 
     // function that ETH left over after stakers purchased
+    /// @notice Returns excess ETH to the pool manager after asset distribution
+    /// @dev This function is called internally after distributing liquidated assets
+    /// @param _assets Array of assets that were distributed
+    /// @param _nativePurchased Total amount of ETH purchased by stakers
     function returnExcessETH(
         VaultifyStructs.Asset[] memory _assets,
         uint256 _nativePurchased
@@ -387,7 +441,9 @@ contract LiquidationPool is ILiquidationPool {
         }
     }
 
-    function claimRewards() external {
+    /// @notice Allows users to claim their accumulated rewards
+    /// @dev Users can claim rewards earned from their staked positions
+    function claimRewards() public {
         // Get the accepted Tokens by the admin
         VaultifyStructs.Token[] memory _tokens = ITokenManager(tokenManager)
             .getAcceptedTokens();
@@ -414,103 +470,171 @@ contract LiquidationPool is ILiquidationPool {
         }
     }
 
-    function getTotalTst() public view returns (uint256 _tstTokens) {
-        for (uint256 i = 0; i < holders.length; i++) {
-            address _holder = holders[i];
-            _tstTokens +=
-                positions[_holder].tstTokens +
-                aggregatedPendingStakes[_holder].tstTokens;
+    // @notice Calculates the total amount of TST tokens in the pool
+    /// @dev Includes both staked and pending TST tokens
+    /// @return _totalTstTokens The total amount of TST tokens in the pool
+    function getTotalTst() public view returns (uint256 _totalTstTokens) {
+        for (uint256 i = 0; i < stakers.length; i++) {
+            address _staker = stakers[i];
+            _totalTstTokens +=
+                positions[_staker].stakedTstAmount +
+                pendingStakes[_staker].pendingTstAmount;
         }
-        return _tstTokens;
+        return _totalTstTokens;
     }
 
+    /// @notice Distributes reward fees to pool participants
+    /// @dev Called by the pool manager to distribute fees among stakers
+    /// @param _amount The total amount of fees to distribute
     function distributeRewardFees(uint256 _amount) external onlyPoolManager {
         uint256 _totalTST = getTotalTst();
 
         if (_totalTST > 0) {
-            for (uint256 i = 0; i < holders.length; i++) {
-                address _holder = holders[i];
+            for (uint256 i = 0; i < stakers.length; i++) {
+                address _staker = stakers[i];
 
                 // distribute fees among already consolidated position
                 uint256 positionsFeeShares = (_amount *
-                    positions[_holder].tstTokens) / _totalTST;
+                    positions[_staker].stakedTstAmount) / _totalTST;
 
-                positions[_holder].eurosTokens += positionsFeeShares;
+                positions[_staker].stakedEurosAmount += positionsFeeShares;
 
                 // distribute Fees among pending position
                 uint256 pendPositionFeeShares = (_amount *
-                    aggregatedPendingStakes[_holder].tstTokens) / _totalTST;
+                    pendingStakes[_staker].pendingTstAmount) / _totalTST;
 
-                aggregatedPendingStakes[_holder]
-                    .eurosTokens += pendPositionFeeShares;
+                pendingStakes[_staker]
+                    .pendingEurosAmount += pendPositionFeeShares;
             }
         }
     }
 
-    function getHolderRewards(
-        address _holder
-    ) private view returns (Rewards[] memory) {
+    /// @notice Retrieves the accumulated rewards for a specific staker
+    /// @dev Calculates and returns the rewards across all supported tokens
+    /// @param _staker The address of the staker
+    /// @return An array of Reward structs representing the staker's rewards
+    function getStakerRewards(
+        address _staker
+    ) private view returns (Reward[] memory) {
         // Get the accepted tokens by the protocol
         VaultifyStructs.Token[] memory _tokens = ITokenManager(tokenManager)
             .getAcceptedTokens();
 
         // Create a fixed sized array based on the length of _tokens
-        Rewards[] memory _rewards = new Rewards[](_tokens.length);
+        Reward[] memory _reward = new Reward[](_tokens.length);
 
         for (uint256 i = 0; i < _tokens.length; i++) {
-            _rewards[i] = Rewards(
-                _tokens[i].symbol,
-                rewards[abi.encodePacked(_holder, _tokens[i].symbol)],
-                _tokens[i].dec
-            );
+            _reward[i] = Reward({
+                tokenSymbol: _tokens[i].symbol,
+                rewardAmount: rewards[
+                    abi.encodePacked(_staker, _tokens[i].symbol)
+                ],
+                tokenDecimals: _tokens[i].dec
+            });
         }
-        return _rewards;
+        return _reward;
     }
 
-    // Returns the amount of TST and EUROS tokens of holder pendin stakes
-    function getHolderPendingStakes(
-        address _holder
+    /// @notice Retrieves the pending stakes of a specific holder
+    /// @dev Returns the amounts of TST and EUROs tokens in pending stakes
+    /// @param _staker The address of the stake holder
+    /// @return _pendingTST The amount of pending TST tokens
+    /// @return _pendingEUROS The amount of pending EUROs tokens
+    function getStakerPendingStakes(
+        address _staker
     ) public view returns (uint256 _pendingTST, uint256 _pendingEUROS) {
-        PendingStake memory _pendingStake = aggregatedPendingStakes[_holder];
-        if (_pendingStake.holder == _holder) {
-            _pendingTST += _pendingStake.tstTokens;
-            _pendingEUROS += _pendingStake.eurosTokens;
+        PendingStake memory _pendingStake = pendingStakes[_staker];
+        if (_pendingStake.stakerAddress == _staker) {
+            _pendingTST += _pendingStake.pendingTstAmount;
+            _pendingEUROS += _pendingStake.pendingEurosAmount;
         }
     }
 
-    // function that returns the position of user including their pendingStake Tokens as well as rewards
+    /// @notice Retrieves the current position and rewards of a holder
+    /// @dev Returns the staked amounts and accumulated rewards
+    /// @param _staker The address of the position holder
+    /// @return _position The current staked position of the holder
+    /// @return _rewards An array of accumulated rewards for the holder
     function getPosition(
-        address _holder
+        address _staker
     )
         external
         view
-        returns (Position memory _position, Rewards[] memory _rewards)
+        returns (Position memory _position, Reward[] memory _rewards)
     {
         // get the user position
-        _position = positions[_holder];
+        _position = positions[_staker];
 
-        // Get the holder pending stakes
-        (uint256 _pendingTST, uint256 _pendingEUROs) = getHolderPendingStakes(
-            _holder
+        // Get the stakerAddress pending stakes
+        (uint256 _pendingTST, uint256 _pendingEUROs) = getStakerPendingStakes(
+            _staker
         );
 
         // Add the total amount of the user deposit in both TST/EUROS
         // in the protocol(pending or staked)
-        _position.eurosTokens += _pendingEUROs;
-        _position.tstTokens += _pendingTST;
+        _position.stakedEurosAmount += _pendingEUROs;
+        _position.stakedTstAmount += _pendingTST;
 
-        //if a holder's staked TST is greater than zero, they receive additional
+        //if a stakerAddress's staked TST is greater than zero, they receive additional
         // EUROs proportional to their TST stake. This mechanism is
-        // designed to encourage holders to deposit more TST governance to the pool
+        // designed to encourage stakers to deposit more TST governance to the pool
         // tokens into the pool
 
-        if (_position.tstTokens > 0) {
+        if (_position.stakedTstAmount > 0) {
             uint256 rewardsEuros = (IERC20(EUROs).balanceOf(poolManager) *
-                _position.tstTokens) / getTotalTst();
+                _position.stakedTstAmount) / getTotalTst();
 
-            _position.eurosTokens += rewardsEuros;
+            _position.stakedEurosAmount += rewardsEuros;
         }
 
-        _rewards = getHolderRewards(_holder);
+        _rewards = getStakerRewards(_staker);
+    }
+
+    // function that allow user to remove their stakes in case of of a potential hacks.
+    function emergencyWithdraw() external onlyDuringEmergency {
+        claimRewards();
+
+        Position memory _position = positions[msg.sender];
+        PendingStake memory _pendingStake = pendingStakes[msg.sender];
+        uint256 totalEuros;
+        uint256 totalTst;
+
+        {
+            totalEuros =
+                _position.stakedEurosAmount +
+                _pendingStake.pendingEurosAmount;
+
+            if (totalEuros > 0) {
+                IERC20(EUROs).safeTransfer(msg.sender, totalEuros);
+            }
+        }
+
+        {
+            totalTst =
+                _position.stakedTstAmount +
+                _pendingStake.pendingTstAmount;
+
+            if (totalTst > 0) {
+                IERC20(TST).safeTransfer(msg.sender, totalTst);
+            }
+        }
+        deletePosition(msg.sender);
+        delete pendingStakes[msg.sender];
+
+        emit VaultifyEvents.EmergencyWithdrawal(
+            msg.sender,
+            totalEuros,
+            totalTst
+        );
+    }
+
+    /// @notice Toggles the emergency state of the contract
+    /// @dev Can only be called by the pool manager
+    /// @param _isEmergencyActive The new emergency state
+    function setEmergencyState(
+        bool _isEmergencyActive
+    ) external onlyPoolManager {
+        isEmergencyActive = _isEmergencyActive;
+        emit VaultifyEvents.EmergencyStateChanged(_isEmergencyActive);
     }
 }

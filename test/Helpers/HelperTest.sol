@@ -83,7 +83,7 @@ abstract contract HelperTest is Test {
     address public wbtc;
     address public paxg;
 
-    address public protocol;
+    address public protocolTreasury;
 
     ////// Oracle Contracts //////
     AggregatorV3InterfaceMock priceFeedNativeUsd;
@@ -119,7 +119,8 @@ abstract contract HelperTest is Test {
         // fork the Arbitrum one
         vm.createSelectFork("arbitrum", 228297650);
 
-        protocol = treasury;
+        // @audit-issue NOT SURE about the protocol address yeT? will set it to liquidatioPoolManager contract???
+        protocolTreasury = treasury;
 
         bytes32 _native = bytes32(abi.encodePacked("ETH"));
         native = _native;
@@ -240,7 +241,7 @@ abstract contract HelperTest is Test {
             _burnFeeRate: burnFeeRate,
             _swapFeeRate: swapFeeRate,
             _collateralRate: collateralRate,
-            _protocol: protocol,
+            _protocolTreasury: protocolTreasury,
             _liquidator: liquidator,
             _tokenManager: tokenManager,
             _smartVaultDeployer: smartVaultDeployer,
@@ -253,7 +254,7 @@ abstract contract HelperTest is Test {
             _EUROs: euros,
             _smartVaultManager: address(proxySmartVaultManager),
             _eurUsdFeed: chainlinkEurUsd,
-            _protocol: payable(protocol),
+            _protocolTreasury: payable(protocolTreasury),
             _poolFeePercentage: poolFeePercentage
         });
 

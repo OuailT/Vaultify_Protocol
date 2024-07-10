@@ -61,5 +61,13 @@ library VaultifyEvents {
         uint256 eurosValue
     );
 
+    event EmergencyStateChanged(bool emergencyState);
+
+    event EmergencyWithdrawal(
+        address staker,
+        uint256 totalEuros,
+        uint256 totalTst
+    );
+
     event VaultTransferred(uint256 _tokenId, uint256 _from, uint256 _to);
 }

@@ -32,7 +32,7 @@ contract SmartVaultManager is
 
     uint256 public constant HUNDRED_PRC = 1e5;
 
-    address public protocol;
+    address public protocolTreasury;
     address public liquidator;
     address public euros;
     uint256 public collateralRate;
@@ -69,7 +69,7 @@ contract SmartVaultManager is
         address _swapRouter,
         address _nftMetadataGenerator,
         address _smartVaultDeployer,
-        address _protocol,
+        address _protocolTreasury,
         address _liquidator,
         address _euros
     ) external initializer {
@@ -82,7 +82,7 @@ contract SmartVaultManager is
         setSwapRouter2(_swapRouter);
         setNFTMetadataGenerator(_nftMetadataGenerator);
         setSmartVaultDeployer(_smartVaultDeployer);
-        setProtocolAddress(_protocol);
+        setProtocolAddress(_protocolTreasury);
         setLiquidator(_liquidator);
         smartVaultIndexContract = ISmartVaultIndex(_smartVaultIndex);
         euros = _euros;
@@ -239,8 +239,8 @@ contract SmartVaultManager is
         smartVaultDeployer = _smartVaultDeployer;
     }
 
-    function setProtocolAddress(address _protocol) public onlyOwner {
-        protocol = _protocol;
+    function setProtocolAddress(address _protocolTreasury) public onlyOwner {
+        protocolTreasury = _protocolTreasury;
     }
 
     function setLiquidator(address _liquidator) public onlyOwner {

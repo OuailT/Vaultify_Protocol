@@ -26,7 +26,7 @@ contract LiquidationPoolManager is
     address private TST;
     address private EUROs;
     address public smartVaultManager;
-    address payable private protocol;
+    address payable private protocolTreasury;
     address public pool;
     address private eurUsdFeed;
 
@@ -45,7 +45,7 @@ contract LiquidationPoolManager is
         address _EUROs,
         address _smartVaultManager,
         address _eurUsdFeed,
-        address payable _protocol,
+        address payable _protocolTreasury,
         uint32 _poolFeePercentage
     ) external initializer {
         // Address check for zero address NOTE
@@ -54,7 +54,7 @@ contract LiquidationPoolManager is
         TST = _TST;
         EUROs = _EUROs;
         smartVaultManager = _smartVaultManager;
-        protocol = _protocol;
+        protocolTreasury = _protocolTreasury;
         poolFeePercentage = _poolFeePercentage;
     }
 
@@ -85,7 +85,7 @@ contract LiquidationPoolManager is
             LiquidationPool(pool).distributeRewardFees(_feesForPool);
         }
 
-        eurosTokens.safeTransfer(protocol, totalEurosBal);
+        eurosTokens.safeTransfer(protocolTreasury, totalEurosBal);
     }
 
     function executeLiquidation(uint256 _tokenId) external {
@@ -151,13 +151,13 @@ contract LiquidationPoolManager is
             if (token.addr == address(0)) {
                 uint256 ethBal = address(this).balance;
                 if (ethBal > 0) {
-                    (bool succeed, ) = protocol.call{value: ethBal}("");
+                    (bool succeed, ) = protocolTreasury.call{value: ethBal}("");
                     if (!succeed) revert VaultifyErrors.NativeTxFailed();
                 }
             } else {
                 uint256 ercBal = IERC20(token.addr).balanceOf(address(this));
                 if (ercBal > 0) {
-                    IERC20(token.addr).transfer(protocol, ercBal);
+                    IERC20(token.addr).transfer(protocolTreasury, ercBal);
                 }
             }
         }

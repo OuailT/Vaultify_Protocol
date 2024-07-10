@@ -63,7 +63,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         );
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
             fee,
             "Liquidator's balance should be equal to the fee"
         );
@@ -112,7 +112,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             "Total collateral value should remain the same"
         );
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
             fee,
             "Liquidator's balance should be equal to the fee"
         );
@@ -204,7 +204,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             "Owner's balance should be total borrowed amount minus total fee"
         );
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
             totalFee,
             "Liquidator's balance should be equal to the total fee"
         );
@@ -237,65 +237,6 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         });
         vm.stopPrank();
     }
-
-    // function test_revert_borrow_liquidated_Vault() public {
-    //     (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
-    //     vault = _vaults[0];
-
-    //     VaultifyStructs.VaultStatus memory statusBeforeLiquidation = vault
-    //         .vaultStatus();
-
-    //     uint256 maxBorrowableEuros = statusBeforeLiquidation.maxBorrowableEuros;
-
-    //     // Borrow 95% of EUROS with the current prices
-    //     uint256 amountToBorrow = (maxBorrowableEuros * 99) / 100;
-
-    //     console.log(
-    //         "max Borrowable Euros before price drops",
-    //         maxBorrowableEuros
-    //     );
-
-    //     vm.startPrank(_owner);
-    //     vault.borrow(_owner, amountToBorrow);
-    //     vm.stopPrank();
-
-    //     // Drop ETH and WBTC prices to put the vault in undercollateralization status
-    //     priceFeedNativeUsd.setPrice(1900 * 1e8); // Price drops from $2200 to $1900
-    //     priceFeedwBtcUsd.setPrice(40000 * 1e8); // Price drops from $42000 to $40000
-
-    //     VaultifyStructs.VaultStatus memory statusAfterLiquidation = vault
-    //         .vaultStatus();
-
-    //     uint256 maxBorrowableEurosAfter = statusAfterLiquidation
-    //         .maxBorrowableEuros;
-
-    //     console.log(
-    //         "max Borrowable Euros after price drops",
-    //         maxBorrowableEurosAfter
-    //     );
-
-    //     vm.startPrank(address(vault.manager()));
-    //     vault.liquidate();
-    //     vm.stopPrank();
-
-    //     vm.startPrank(_owner);
-
-    //     _expectRevertWithCustomError({
-    //         target: address(vault),
-    //         callData: abi.encodeWithSelector(
-    //             vault.borrow.selector,
-    //             _owner,
-    //             50 * 1e18
-    //         ),
-    //         expectedErrorSignature: "LiquidatedVault(address)",
-    //         errorData: abi.encodeWithSelector(
-    //             VaultifyErrors.LiquidatedVault.selector,
-    //             vault
-    //         )
-    //     });
-
-    //     vm.stopPrank();
-    // }
 
     function test_revert_borrow_nonVault_Owner() public {
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
@@ -394,7 +335,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         );
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
             repayFee + borrowFee,
             "Liquidator balance after repaying is not correct"
         );
@@ -453,7 +394,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         );
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
             borrowFee + fullRepayFee,
             "Liquidator balance after full repayment is not correct"
         );
@@ -538,7 +479,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             additionalMintFee;
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.liquidator()),
+            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
             expectedLiquidatorBalance,
             "Liquidator balance after borrowing again is not correct"
         );
@@ -1402,7 +1343,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             "Testing successful liquidation of an undercollateralized vault"
         );
 
-        address vaultLiquidator = proxySmartVaultManager.liquidator();
+        address vaultLiquidator = proxySmartVaultManager.protocolTreasury();
 
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];

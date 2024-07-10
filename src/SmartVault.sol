@@ -285,7 +285,7 @@ contract SmartVault is ISmartVault {
         uint EthBal = address(this).balance;
         // Check if the vault has enough ETH balance
         if (EthBal != 0) {
-            (bool succ, ) = payable(smartVaultManager.liquidator()).call{
+            (bool succ, ) = payable(smartVaultManager.protocolTreasury()).call{
                 value: EthBal
             }("");
             if (!succ) revert VaultifyErrors.NativeTxFailed();
@@ -300,7 +300,7 @@ contract SmartVault is ISmartVault {
         uint256 Erc20Bal = _token.balanceOf(address(this));
         // Check if the contract has enough balance for the specific token
         if (_token.balanceOf(address(this)) != 0) {
-            _token.safeTransfer(smartVaultManager.liquidator(), Erc20Bal);
+            _token.safeTransfer(smartVaultManager.protocolTreasury(), Erc20Bal);
         }
     }
 
@@ -332,7 +332,7 @@ contract SmartVault is ISmartVault {
 
         EUROs.mint(_to, amountToMint);
 
-        EUROs.mint(smartVaultManager.liquidator(), fee);
+        EUROs.mint(smartVaultManager.protocolTreasury(), fee);
 
         emit VaultifyEvents.EUROsMinted(_to, amountToMint, fee);
     }
@@ -377,7 +377,7 @@ contract SmartVault is ISmartVault {
 
         IERC20(address(EUROs)).safeTransferFrom(
             msg.sender,
-            smartVaultManager.liquidator(),
+            smartVaultManager.protocolTreasury(),
             fee
         );
 
@@ -480,8 +480,8 @@ contract SmartVault is ISmartVault {
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
     ) private returns (uint256 amountOut) {
-        // Send fees to liquidator
-        (bool succ, ) = payable(smartVaultManager.liquidator()).call{
+        // Send fees to protocolTreasury
+        (bool succ, ) = payable(smartVaultManager.protocolTreasury()).call{
             value: _swapFee
         }("");
 
@@ -509,16 +509,13 @@ contract SmartVault is ISmartVault {
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
     ) private returns (uint256 amountOut) {
-        // Send fees to liquidator
+        // Send fees to protocolTreasury
         IERC20(_params.tokenIn).safeTransfer(
-            smartVaultManager.liquidator(),
+            smartVaultManager.protocolTreasury(),
             _swapFee
         );
 
-        // //@audit todo Check the difference between forceApprove and increaseallowance?
-        // approve the router to spend amountin on the vault behalf to conduct the swap
-        // @audit check forceApprove vs approve
-        IERC20(_params.tokenIn).forceApprove(
+        IERC20(_params.tokenIn).safeIncreaseAllowance(
             smartVaultManager.swapRouter2(),
             _params.amountIn
         );
@@ -527,7 +524,6 @@ contract SmartVault is ISmartVault {
         amountOut = ISwapRouter(smartVaultManager.swapRouter2())
             .exactInputSingle(_params);
 
-        // If user Swap AToken/WETH then we convert WETH to ETH
         IWETH weth = IWETH(smartVaultManager.weth());
 
         // Convert potentially received weth to ETH

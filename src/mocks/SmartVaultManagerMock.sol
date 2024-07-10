@@ -36,7 +36,7 @@ contract SmartVaultManagerMock is
 
     uint256 public constant HUNDRED_PRC = 1e5; // 100%;
 
-    address public protocol;
+    address public protocolTreasury;
     address public liquidator;
     address public euros;
     uint256 public collateralRate;
@@ -70,7 +70,7 @@ contract SmartVaultManagerMock is
         uint256 _burnFeeRate,
         uint256 _swapFeeRate,
         uint256 _collateralRate,
-        address _protocol,
+        address _protocolTreasury,
         address _liquidator,
         address _tokenManager,
         address _smartVaultDeployer,
@@ -84,7 +84,7 @@ contract SmartVaultManagerMock is
         setBurnFeeRate(_burnFeeRate);
         setSwapFeeRate(_swapFeeRate);
         setSmartVaultDeployer(_smartVaultDeployer);
-        setProtocolAddress(_protocol);
+        setProtocolAddress(_protocolTreasury);
         setLiquidatorAddress(_liquidator);
         setWethAddress(address(_weth));
         smartVaultIndexContract = ISmartVaultIndex(_smartVaultIndex);
@@ -241,8 +241,8 @@ contract SmartVaultManagerMock is
         smartVaultDeployer = _smartVaultDeployer;
     }
 
-    function setProtocolAddress(address _protocol) public onlyOwner {
-        protocol = _protocol;
+    function setProtocolAddress(address _protocolTreasury) public onlyOwner {
+        protocolTreasury = _protocolTreasury;
     }
 
     function setLiquidatorAddress(address _liquidator) public onlyOwner {

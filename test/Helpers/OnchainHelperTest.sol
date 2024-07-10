@@ -75,7 +75,7 @@ abstract contract OnchainHelperTest is Test {
 
     // Assets Interfaces
     IEUROs public EUROs;
-    IERC20Mock public TST; // Standard protocol
+    IERC20Mock public TST; // Standard protocolTreasury
     IERC20Mock public WBTC;
     IERC20Mock public PAXG; // tokenized gold
     IERC20Mock public LINK;
@@ -97,7 +97,7 @@ abstract contract OnchainHelperTest is Test {
     address private constant weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address private constant link = 0xf97f4df75117a78c1A5a0DBb814Af92458539FB4;
 
-    address public protocol;
+    address public protocolTreasury;
 
     ////// Oracle Contracts //////
     AggregatorV3InterfaceMock priceFeedNativeUsd;
@@ -154,7 +154,7 @@ abstract contract OnchainHelperTest is Test {
         // fork the Arbitrum one
         arbitrumFork = vm.createSelectFork("arbitrum", 228297650);
 
-        protocol = treasury;
+        protocolTreasury = treasury;
 
         bytes32 _native = bytes32(abi.encodePacked("ETH"));
         native = _native;
@@ -260,7 +260,7 @@ abstract contract OnchainHelperTest is Test {
             _burnFeeRate: burnFeeRate,
             _swapFeeRate: swapFeeRate,
             _collateralRate: collateralRate,
-            _protocol: protocol,
+            _protocolTreasury: protocolTreasury,
             _liquidator: liquidator,
             _tokenManager: tokenManager,
             _smartVaultDeployer: smartVaultDeployer,
@@ -273,7 +273,7 @@ abstract contract OnchainHelperTest is Test {
             _EUROs: euros,
             _smartVaultManager: address(proxySmartVaultManager),
             _eurUsdFeed: chainlinkEurUsd,
-            _protocol: payable(protocol),
+            _protocolTreasury: payable(protocolTreasury),
             _poolFeePercentage: poolFeePercentage
         });
 

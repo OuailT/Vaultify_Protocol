@@ -6,7 +6,7 @@ import {Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/Ini
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
 
-import {LiquidationPool} from "./LiquidationPool.sol";
+import {LiquidityPool} from "./LiquidityPool.sol";
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
 import {ITokenManager} from "./interfaces/ITokenManager.sol";
 import {ILiquidationPoolManager} from "./interfaces/ILiquidationPoolManager.sol";
@@ -62,7 +62,7 @@ contract LiquidationPoolManager is
 
     function createLiquidityPool() external onlyOwner returns (address) {
         pool = address(
-            new LiquidationPool(
+            new LiquidityPool(
                 TST,
                 EUROs,
                 eurUsdFeed,
@@ -71,18 +71,18 @@ contract LiquidationPoolManager is
         );
     }
 
-    function distributeFees() public onlyOwner {
+    function distributeFees() public {
         IERC20 eurosTokens = IERC20(EUROs);
         uint256 totalEurosBal = eurosTokens.balanceOf(address(this));
 
-        // Calculate the fees based on the available Euros in the liquidationPool Manager
+        // Calculate the fees based on the available Euros in the LiquidityPool Manager
         uint256 _feesForPool = (totalEurosBal * poolFeePercentage) /
             HUNDRED_PRC;
 
         if (_feesForPool > 0) {
             // Approve the pool to send the amount
             eurosTokens.approve(pool, _feesForPool);
-            LiquidationPool(pool).distributeRewardFees(_feesForPool);
+            LiquidityPool(pool).distributeRewardFees(_feesForPool);
         }
 
         eurosTokens.safeTransfer(protocolTreasury, totalEurosBal);
@@ -133,7 +133,7 @@ contract LiquidationPoolManager is
             }
         }
 
-        LiquidationPool(pool).distributeLiquatedAssets{value: liquidatorEthBal}(
+        LiquidityPool(pool).distributeLiquatedAssets{value: liquidatorEthBal}(
             _assets,
             vaultManager.collateralRate(),
             vaultManager.HUNDRED_PRC()

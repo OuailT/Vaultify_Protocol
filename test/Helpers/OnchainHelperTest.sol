@@ -12,7 +12,7 @@ import {IWETH} from "src/interfaces/IWETH.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import {ISmartVaultManagerMock} from "src/mocks/ISmartVaultManagerMock.sol";
 import {ILiquidationPoolManager} from "src/interfaces/ILiquidationPoolManager.sol";
-import {ILiquidationPool} from "src/interfaces/ILiquidationPool.sol";
+import {ILiquidityPool} from "src/interfaces/ILiquidityPool.sol";
 // import {ISmartVaultMock} from "src/interfaces/ISmartVaultMock.sol";
 import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import {ITokenManager} from "src/interfaces/ITokenManager.sol";
@@ -36,7 +36,7 @@ import {ChainlinkMockForTest} from "src/mocks/ChainlinkMock.sol";
 // import {SmartVaultManager} from "src/SmartVaultManager.sol";
 import {SmartVaultManagerMock} from "src/mocks/SmartVaultManagerMock.sol";
 import {LiquidationPoolManager} from "src/LiquidationPoolManager.sol";
-import {LiquidationPool} from "src/LiquidationPool.sol";
+import {LiquidityPool} from "src/LiquidityPool.sol";
 
 // Import library
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
@@ -49,7 +49,7 @@ abstract contract OnchainHelperTest is Test {
     // SETUP//
     ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
-    ILiquidationPool public liquidationPoolContract;
+    ILiquidityPool public liquidationPoolContract;
     ISmartVaultDeployer public smartVaultDeployerContract;
 
     ITokenManager public tokenManagerContract;
@@ -282,7 +282,7 @@ abstract contract OnchainHelperTest is Test {
         // // deploy a new Pool
         pool = proxyLiquidityPoolManager.createLiquidityPool();
 
-        liquidationPoolContract = ILiquidationPool(pool);
+        liquidationPoolContract = ILiquidityPool(pool);
 
         // set liquidator to liquidation pool manager contract
         liquidator = address(proxyLiquidityPoolManager);

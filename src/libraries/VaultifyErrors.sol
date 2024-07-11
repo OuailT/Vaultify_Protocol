@@ -10,6 +10,7 @@ library VaultifyErrors {
     error InsufficientBalance(address caller, uint256 balance, uint256 amount);
     error NotEnoughEthBalance();
     error EmergencyStateNotActive();
+    error EmergencyStateIsActive();
     error NothingToRepay();
     error ZeroAmountNotAllowed();
     error NotEnoughTokenBalance();

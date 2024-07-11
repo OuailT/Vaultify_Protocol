@@ -88,10 +88,7 @@ contract SmartVaultManager is
         euros = _euros;
     }
 
-    function createNewVault()
-        external
-        returns (uint256 tokenId, address vault)
-    {
+    function mintNewVault() external returns (uint256 tokenId, address vault) {
         // increment tokenId by 1
         tokenId = lastTokenId + 1;
 

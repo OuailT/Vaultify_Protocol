@@ -11,7 +11,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import {ISmartVaultManagerMock} from "src/mocks/ISmartVaultManagerMock.sol";
 import {ILiquidationPoolManager} from "src/interfaces/ILiquidationPoolManager.sol";
-import {ILiquidationPool} from "src/interfaces/ILiquidationPool.sol";
+import {ILiquidityPool} from "src/interfaces/ILiquidityPool.sol";
 // import {ISmartVaultMock} from "src/interfaces/ISmartVaultMock.sol";
 import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import {ITokenManager} from "src/interfaces/ITokenManager.sol";
@@ -35,7 +35,7 @@ import {ChainlinkMockForTest} from "src/mocks/ChainlinkMock.sol";
 // import {SmartVaultManager} from "src/SmartVaultManager.sol";
 import {SmartVaultManagerMock} from "src/mocks/SmartVaultManagerMock.sol";
 import {LiquidationPoolManager} from "src/LiquidationPoolManager.sol";
-import {LiquidationPool} from "src/LiquidationPool.sol";
+import {LiquidityPool} from "src/LiquidityPool.sol";
 
 // Import library
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
@@ -48,7 +48,7 @@ abstract contract HelperTest is Test {
     // SETUP//
     ISmartVaultManagerMock public smartVaultManagerContract;
     ILiquidationPoolManager public liquidationPoolManagerContract;
-    ILiquidationPool public liquidationPoolContract;
+    ILiquidityPool public liquidityPoolContract;
 
     ITokenManager public tokenManagerContract;
     ISmartVaultIndex public smartVaultIndexContract;
@@ -107,6 +107,7 @@ abstract contract HelperTest is Test {
     /*************ACCOUNTS */
     address internal admin = makeAddr("Admin");
     address internal alice = makeAddr("Alice");
+    address internal bob = makeAddr("Bob");
     address internal treasury = payable(makeAddr("Treasury"));
     address internal liquidator = makeAddr("Liquidator");
     address internal vaultManager = makeAddr("SmartVaultManager");
@@ -116,9 +117,6 @@ abstract contract HelperTest is Test {
     ProxyAdmin internal proxyAdmin;
 
     function setUp() public virtual {
-        // fork the Arbitrum one
-        vm.createSelectFork("arbitrum", 228297650);
-
         // @audit-issue NOT SURE about the protocol address yeT? will set it to liquidatioPoolManager contract???
         protocolTreasury = treasury;
 
@@ -261,9 +259,12 @@ abstract contract HelperTest is Test {
         proxySmartVaultIndex.initialize(address(proxySmartVaultManager));
 
         // // deploy a new Pool
-        pool = proxyLiquidityPoolManager.createLiquidityPool();
+        proxyLiquidityPoolManager.createLiquidityPool();
 
-        liquidationPoolContract = ILiquidationPool(pool);
+        pool = proxyLiquidityPoolManager.pool();
+        console.log("Created Pool", pool);
+
+        liquidityPoolContract = ILiquidityPool(pool);
 
         // set liquidator to liquidation pool manager contract
         liquidator = address(proxyLiquidityPoolManager);
@@ -305,19 +306,20 @@ abstract contract HelperTest is Test {
     }
 
     ////////// Function Utilities /////////////
-    function createUser(
+    function fundUserWallet(
         uint256 _id,
         uint256 _balance
-    ) internal returns (address) {
-        address user = vm.addr(_id + _balance);
-        vm.label(user, "User");
+    ) public returns (address) {
+        address _user = vm.addr(_id + _balance);
+        vm.label(_user, "User");
 
-        vm.deal(user, _balance * 1e18);
-        TST.mint(user, _balance * 1e18);
-        WBTC.mint(user, _balance * 1e18);
-        PAXG.mint(user, _balance * 1e18);
+        vm.deal(_user, _balance * 1e18);
+        TST.mint(_user, _balance * 1e18);
+        EUROs.mint(_user, _balance * 1e18);
+        WBTC.mint(_user, _balance * 1e8);
+        PAXG.mint(_user, _balance * 1e18);
 
-        return user;
+        return _user;
     }
 
     function createVaultOwners(
@@ -328,7 +330,7 @@ abstract contract HelperTest is Test {
 
         for (uint256 i = 0; i < _numOfOwners; i++) {
             // create vault owners;
-            _vaultOwner = createUser(i, 100);
+            _vaultOwner = fundUserWallet(i, 100);
             vm.startPrank(_vaultOwner);
 
             // 1- Mint a vault

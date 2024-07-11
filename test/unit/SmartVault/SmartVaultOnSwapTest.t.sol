@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.17;
 
-import {OnchainHelperTest} from "../Helpers/OnchainHelperTest.sol";
-import {ExpectRevert} from "../Helpers/ExpectRevert.sol";
+import {OnchainHelperTest} from "../..//Helpers/OnchainHelperTest.sol";
+import {ExpectRevert} from "../..//Helpers/ExpectRevert.sol";
 import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";

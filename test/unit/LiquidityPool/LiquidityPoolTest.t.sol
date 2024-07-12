@@ -28,6 +28,10 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         uint256 initialTstBalance = TST.balanceOf(bob);
         uint256 initialEurosBalance = EUROs.balanceOf(bob);
 
+        // // Initial Pool Balance in TST and EUROs;
+        // uint256 initialPoolTstBalance = TST.balanceOf(pool);
+        // uint256 initialPoolEurosBalance = EUROs.balanceOf(pool);
+
         console.log(initialTstBalance);
         console.log(initialEurosBalance);
         console.log(bob);
@@ -43,7 +47,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
 
         vm.stopPrank();
 
-        // Check balances
+        // Check balances Staker balance
         assertEq(
             TST.balanceOf(bob),
             initialTstBalance - 50 ether,
@@ -54,6 +58,10 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             initialEurosBalance - 50 ether,
             "EUROs balance should decrease by 50"
         );
+
+        // Check the pool balance;
+        assertEq(TST.balanceOf(pool), 50 ether);
+        assertEq(EUROs.balanceOf(pool), 50 ether);
 
         // Check position
         (VaultifyStructs.Position memory position, ) = liquidityPoolContract

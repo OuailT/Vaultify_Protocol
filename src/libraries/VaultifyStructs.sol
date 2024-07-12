@@ -17,7 +17,7 @@ library VaultifyStructs {
         /// @notice The Ethereum address of the staker
         address stakerAddress;
         /// @notice The Unix timestamp when this pending stake was created
-        uint256 createdAt;
+        uint256 pendingDuration;
         /// @notice The amount of TST tokens in this pending stake
         uint256 pendingTstAmount;
         /// @notice The amount of EUROs tokens in this pending stake

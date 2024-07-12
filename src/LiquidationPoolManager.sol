@@ -71,7 +71,7 @@ contract LiquidationPoolManager is
         );
     }
 
-    function distributeFees() public {
+    function distributeEurosFees() public {
         IERC20 eurosTokens = IERC20(EUROs);
         uint256 totalEurosBal = eurosTokens.balanceOf(address(this));
 

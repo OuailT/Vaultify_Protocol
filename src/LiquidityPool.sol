@@ -98,7 +98,6 @@ contract LiquidityPool is ILiquidityPool {
         if (!isEurosApproved) revert VaultifyErrors.NotEnoughEurosAllowance();
         if (!isTstApproved) revert VaultifyErrors.NotEnoughTstAllowance();
 
-        consolidatePendingStakes();
         ILiquidationPoolManager(poolManager).distributeFees();
 
         if (_tstVal > 0) {
@@ -119,15 +118,14 @@ contract LiquidityPool is ILiquidityPool {
         VaultifyStructs.PendingStake memory updatePendingStake = VaultifyStructs
             .PendingStake({
                 stakerAddress: msg.sender,
-                createdAt: block.timestamp,
+                pendingDuration: block.timestamp + 1 days,
                 pendingTstAmount: stake.pendingTstAmount + _tstVal,
                 pendingEurosAmount: stake.pendingEurosAmount + _eurosVal
             });
 
         pendingStakes[msg.sender] = updatePendingStake;
 
-        // Add the staker/stakerAddress as unique to avoid duplicate address
-        addUniqueStaker(msg.sender); // TODO
+        addUniqueStaker(msg.sender);
 
         emit VaultifyEvents.PositionIncreased(
             msg.sender,
@@ -146,7 +144,7 @@ contract LiquidityPool is ILiquidityPool {
         uint256 _eurosVal
     ) external onlyWhenNotEmergency {
         consolidatePendingStakes();
-        ILiquidationPoolManager(poolManager).distributeFees();
+        ILiquidationPoolManager(poolManager).distributeEurosFees();
 
         // READ from memory
         VaultifyStructs.Position memory _stakerPosition = positions[msg.sender];
@@ -226,25 +224,24 @@ contract LiquidityPool is ILiquidityPool {
         }
     }
 
+    // @audit-info change visibility from private to public to test it out.
     /// @notice Consolidates pending stakes into active positions
     /// @dev This function is called internally to process pending stakes that are older than 24 hours
     /// @dev It helps prevent front-running attacks and ensures fair reward distribution
-    function consolidatePendingStakes() private {
-        // Create a dealine variable to check the validity of the order
-        uint256 deadline = block.timestamp - 1 days;
-
+    function consolidatePendingStakes() public {
         for (uint256 i = 0; i < stakers.length; i++) {
             address stakerAddress = stakers[i];
 
+            // @audit-info double check this
             // State changing operation
             VaultifyStructs.PendingStake storage _pendingStake = pendingStakes[
                 stakerAddress
             ];
 
-            // @audit-issue Check if stakerAddress == _pending.stakerAddress to avoid storage collision.
+            // This ensures that only pending stakes created more than 24 hours ago will be consolidated
             // This is done to reduce MEV opportunities(wait at least 24H to increase position)
             // To prevent front-runing attacks to take advantage of rewards
-            if (_pendingStake.createdAt < deadline) {
+            if (_pendingStake.pendingDuration < block.timestamp) {
                 // READ from STORAGE once
                 VaultifyStructs.Position storage _position = positions[
                     _pendingStake.stakerAddress

@@ -98,7 +98,7 @@ contract LiquidityPool is ILiquidityPool {
         if (!isEurosApproved) revert VaultifyErrors.NotEnoughEurosAllowance();
         if (!isTstApproved) revert VaultifyErrors.NotEnoughTstAllowance();
 
-        ILiquidationPoolManager(poolManager).distributeFees();
+        ILiquidationPoolManager(poolManager).allocateFeesAndAssetsToPool();
 
         if (_tstVal > 0) {
             IERC20(TST).safeTransferFrom(msg.sender, address(this), _tstVal);
@@ -143,8 +143,7 @@ contract LiquidityPool is ILiquidityPool {
         uint256 _tstVal,
         uint256 _eurosVal
     ) external onlyWhenNotEmergency {
-        consolidatePendingStakes();
-        ILiquidationPoolManager(poolManager).distributeEurosFees();
+        ILiquidationPoolManager(poolManager).allocateFeesAndAssetsToPool();
 
         // READ from memory
         VaultifyStructs.Position memory _stakerPosition = positions[msg.sender];
@@ -299,9 +298,6 @@ contract LiquidityPool is ILiquidityPool {
         uint256 _collateralRate,
         uint256 _hundredPRC
     ) external payable {
-        // Consolidate pending stakes
-        consolidatePendingStakes();
-
         // get the price of EURO/USD from chainlink
         (, int256 priceEurUsd, , , ) = AggregatorV3Interface(euroUsdFeed)
             .latestRoundData();

@@ -71,6 +71,7 @@ contract LiquidationPoolManager is
         );
     }
 
+    // @audit-info consolidateFees before feedistribution.
     function distributeEurosFees() public {
         IERC20 eurosTokens = IERC20(EUROs);
         uint256 totalEurosBal = eurosTokens.balanceOf(address(this));
@@ -88,14 +89,21 @@ contract LiquidationPoolManager is
         eurosTokens.safeTransfer(protocolTreasury, totalEurosBal);
     }
 
+    // @audit-info NOTE: liquidator is liquidityPoolManager(TODO: set address of liquidator/protocol to address(thuis))
     function executeLiquidation(uint256 _tokenId) external {
+        ILiquidityPool(pool).consolidatePendingStakes();
+        distributeEurosFees();
         // 1- Liquidate the vault that is under collatralized
         // Liquidation poool manager receives assets that has being liquidated from smart vault
         ISmartVaultManager vaultManager = ISmartVaultManager(smartVaultManager);
         vaultManager.liquidateVault(_tokenId);
+        relayLiquidatedAssetsToPool();
+    }
 
-        // 2- Distribute penrcentage of Fees among stakers and to the protocol coming from mint/burn/Swap
-        distributeFees();
+    function relayLiquidatedAssetsToPool() internal {
+        // 1- Liquidate the vault that is under collatralized
+        // Liquidation poool manager receives assets that has being liquidated from smart vault
+        ISmartVaultManager vaultManager = ISmartVaultManager(smartVaultManager);
 
         // get all the accepted array by the protocol
         VaultifyStructs.Token[] memory _tokens = ITokenManager(
@@ -106,19 +114,18 @@ contract LiquidationPoolManager is
             _tokens.length
         );
 
-        uint256 liquidatorEthBal;
+        uint256 ethBalance;
+        bool assetsAllocated;
 
         //Allocate all the assets received by the liquitor(address(this)) and distribute them to stakers
         for (uint256 i = 0; i < _tokens.length; i++) {
             // check if token.addr is address(0)
             VaultifyStructs.Token memory _token = _tokens[i];
             if (_token.addr == address(0)) {
-                liquidatorEthBal = address(this).balance;
-                if (liquidatorEthBal > 0) {
-                    _assets[i] = VaultifyStructs.Asset(
-                        _token,
-                        liquidatorEthBal
-                    );
+                ethBalance = address(this).balance;
+                if (ethBalance > 0) {
+                    _assets[i] = VaultifyStructs.Asset(_token, ethBalance);
+                    assetsAllocated = true;
                 }
             } else {
                 IERC20 ierc20Token = IERC20(_token.addr);
@@ -128,24 +135,32 @@ contract LiquidationPoolManager is
                         _token,
                         liquidatorErcBal
                     );
-                    ierc20Token.approve(pool, liquidatorErcBal);
+                    ierc20Token.safeIncreaseAllowance(pool, liquidatorErcBal);
+                    assetsAllocated = true;
                 }
             }
         }
 
-        LiquidityPool(pool).distributeLiquatedAssets{value: liquidatorEthBal}(
-            _assets,
-            vaultManager.collateralRate(),
-            vaultManager.HUNDRED_PRC()
-        );
-
-        // Fowards any token that the contract holds to the protocol address
-        forwardsRemainingRewards(_tokens);
+        if (liquidatorErcBal) {
+            LiquidityPool(pool).distributeLiquatedAssets{value: ethBalance}(
+                _assets,
+                vaultManager.collateralRate(),
+                vaultManager.HUNDRED_PRC()
+            );
+        }
     }
 
-    function forwardsRemainingRewards(
-        VaultifyStructs.Token[] memory _tokens
-    ) private {
+    function allocateFeesAndAssetsToPool() {
+        ILiquidityPool(pool).consolidatePendingStakes();
+        distributeEurosFees();
+        relayLiquidatedAssetsToPool();
+    }
+
+    // Fowards any token that the contract holds to the protocol/Trasury address
+    function forwardRemainingAssetsToTreasury() public onlyOwner {
+        VaultifyStructs.Token[] memory _tokens = ITokenManager(
+            vaultManager.tokenManager()
+        ).getAcceptedTokens();
         for (uint256 i = 0; i < _tokens.length; i++) {
             VaultifyStructs.Token memory token = _tokens[i];
             if (token.addr == address(0)) {

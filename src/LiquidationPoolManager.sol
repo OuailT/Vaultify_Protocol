@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
 
 import {LiquidityPool} from "./LiquidityPool.sol";
+import {ILiquidityPool} from "src/interfaces/ILiquidityPool.sol";
 import {ISmartVaultManager} from "./interfaces/ISmartVaultManager.sol";
 import {ITokenManager} from "./interfaces/ITokenManager.sol";
 import {ILiquidationPoolManager} from "./interfaces/ILiquidationPoolManager.sol";
@@ -86,7 +87,8 @@ contract LiquidationPoolManager is
             LiquidityPool(pool).distributeRewardFees(_feesForPool);
         }
 
-        eurosTokens.safeTransfer(protocolTreasury, totalEurosBal);
+        uint256 remainingBalance = totalEurosBal - _feesForPool;
+        eurosTokens.safeTransfer(protocolTreasury, remainingBalance);
     }
 
     // @audit-info NOTE: liquidator is liquidityPoolManager(TODO: set address of liquidator/protocol to address(thuis))
@@ -141,7 +143,7 @@ contract LiquidationPoolManager is
             }
         }
 
-        if (liquidatorErcBal) {
+        if (assetsAllocated) {
             LiquidityPool(pool).distributeLiquatedAssets{value: ethBalance}(
                 _assets,
                 vaultManager.collateralRate(),
@@ -150,7 +152,7 @@ contract LiquidationPoolManager is
         }
     }
 
-    function allocateFeesAndAssetsToPool() {
+    function allocateFeesAndAssetsToPool() external {
         ILiquidityPool(pool).consolidatePendingStakes();
         distributeEurosFees();
         relayLiquidatedAssetsToPool();
@@ -158,9 +160,13 @@ contract LiquidationPoolManager is
 
     // Fowards any token that the contract holds to the protocol/Trasury address
     function forwardRemainingAssetsToTreasury() public onlyOwner {
+        ISmartVaultManager vaultManager = ISmartVaultManager(smartVaultManager);
+
+        // get all the accepted array by the protocol
         VaultifyStructs.Token[] memory _tokens = ITokenManager(
             vaultManager.tokenManager()
         ).getAcceptedTokens();
+
         for (uint256 i = 0; i < _tokens.length; i++) {
             VaultifyStructs.Token memory token = _tokens[i];
             if (token.addr == address(0)) {

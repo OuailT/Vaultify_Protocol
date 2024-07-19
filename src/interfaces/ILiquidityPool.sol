@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 
 interface ILiquidityPool {
+    function consolidatePendingStakes() external;
     function poolManager() external view returns (address payable);
     function increasePosition(uint256 _tstVal, uint256 _eurosVal) external;
 

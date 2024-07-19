@@ -3,6 +3,7 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {ISmartVaultManager} from "src/interfaces/ISmartVaultManager.sol";
 import {IEUROs} from "src/interfaces/IEUROs.sol";
@@ -229,38 +230,25 @@ contract LiquidityPool is ILiquidityPool {
     /// @dev It helps prevent front-running attacks and ensures fair reward distribution
     function consolidatePendingStakes() public {
         for (uint256 i = 0; i < stakers.length; i++) {
-            address stakerAddress = stakers[i];
+            address _staker = stakers[i];
 
             // @audit-info double check this
             // State changing operation
-            VaultifyStructs.PendingStake storage _pendingStake = pendingStakes[
-                stakerAddress
+            VaultifyStructs.PendingStake memory _pendingStake = pendingStakes[
+                _staker
             ];
 
             // This ensures that only pending stakes created more than 24 hours ago will be consolidated
             // This is done to reduce MEV opportunities(wait at least 24H to increase position)
             // To prevent front-runing attacks to take advantage of rewards
             if (_pendingStake.pendingDuration < block.timestamp) {
-                // READ from STORAGE once
-                VaultifyStructs.Position storage _position = positions[
-                    _pendingStake.stakerAddress
-                ];
-
-                // update Changes in memory first
-                VaultifyStructs.Position memory updatePosition = VaultifyStructs
-                    .Position({
-                        stakerAddress: _pendingStake.stakerAddress,
-                        stakedTstAmount: _position.stakedTstAmount +
-                            _pendingStake.pendingTstAmount,
-                        stakedEurosAmount: _position.stakedEurosAmount +
-                            _pendingStake.pendingEurosAmount
-                    });
-
-                // WRITE TO STORAGE ONCE
-                positions[_pendingStake.stakerAddress] = updatePosition;
-
+                positions[_staker].stakerAddress = _staker;
+                positions[_staker].stakedTstAmount += _pendingStake
+                    .pendingTstAmount;
+                positions[_staker].stakedEurosAmount += _pendingStake
+                    .pendingEurosAmount;
                 // Reset the pending stake
-                delete pendingStakes[stakerAddress];
+                delete pendingStakes[_staker];
             }
         }
     }
@@ -290,6 +278,7 @@ contract LiquidityPool is ILiquidityPool {
 
     /// @notice Distributes liquidated assets to pool participants
     /// @dev Called when assets are liquidated, distributes them among stakers
+    /// @dev collateralRate who permit a discount. It takes the euros in exchange of the asset for e,g 90,9% of the real asset price
     /// @param _assets Array of liquidated assets to distribute
     /// @param _collateralRate The collateral rate used for calculations
     /// @param _hundredPRC Constant representing 100% (used for percentage calculations)
@@ -297,7 +286,7 @@ contract LiquidityPool is ILiquidityPool {
         VaultifyStructs.Asset[] memory _assets,
         uint256 _collateralRate,
         uint256 _hundredPRC
-    ) external payable {
+    ) external payable onlyPoolManager {
         // get the price of EURO/USD from chainlink
         (, int256 priceEurUsd, , , ) = AggregatorV3Interface(euroUsdFeed)
             .latestRoundData();
@@ -345,9 +334,6 @@ contract LiquidityPool is ILiquidityPool {
                             uint256(assetPriceUsd)) / uint256(priceEurUsd)) *
                             _hundredPRC) / _collateralRate;
 
-                        ///TODO  Ask AI how can I think like or how can I develop this mathematical mindset as DeFi developer.
-                        // Ask for resources.
-
                         if (costInEuros > _position.stakedEurosAmount) {
                             // adjusts the portion to be proportional to the available EUROs
                             _portion =
@@ -388,8 +374,14 @@ contract LiquidityPool is ILiquidityPool {
             positions[stakers[j]] = _position;
         }
 
+        uint256 actualBurnAmount = Math.min(
+            burnEuros,
+            IEUROs(EUROs).balanceOf(address(this))
+        );
+
         // Burn EUROS tokens to keep the value of the token and control tokens circulation/supply.
-        if (burnEuros > 0) IEUROs(EUROs).burn(address(this), burnEuros);
+        if (actualBurnAmount > 0)
+            IEUROs(EUROs).burn(address(this), actualBurnAmount);
 
         // return any excess ETH that was distributed to stakers
         returnExcessETH(_assets, nativePurchased);

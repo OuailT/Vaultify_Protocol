@@ -278,6 +278,11 @@ abstract contract HelperTest is Test {
         proxySmartVaultIndex.setVaultManager(address(proxySmartVaultManager));
 
         vm.stopPrank();
+
+        // grant liquidityPool contract the burnerRole to burn EUROs when distributing LiquidatedAsssets.
+        vm.startPrank(address(proxySmartVaultManager));
+        EUROs.grantRole(EUROs.BURNER_ROLE(), address(pool));
+        vm.stopPrank();
     }
 
     function setInitialPrice() private {

@@ -10,6 +10,8 @@ interface ILiquidityPool {
 
     function decreasePosition(uint256 _tstVal, uint256 _eurosVal) external;
 
+    function rewards(bytes memory key) external view returns (uint256);
+
     function distributeLiquatedAssets(
         VaultifyStructs.Asset[] memory _assets,
         uint256 _collateralRate,

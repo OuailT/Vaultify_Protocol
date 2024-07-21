@@ -12,10 +12,10 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
     function setUp() public override {
         super.setUp();
         super.setUpHelper();
-        address _user_1 = fundUserWallet(1, 100);
+        address _user_1 = fundUserWallet(1, 10000);
         bob = _user_1;
 
-        address _user_2 = fundUserWallet(2, 100);
+        address _user_2 = fundUserWallet(2, 10000);
         alice = _user_2;
     }
 
@@ -100,16 +100,16 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         );
 
         // Simulate some liquidated assets in the pool manager
-        vm.deal(address(proxyLiquidityPoolManager), 1 ether); // 1ETH
-        WBTC.mint(address(proxyLiquidityPoolManager), 1e8); // 1 WBTC
-        PAXG.mint(address(proxyLiquidityPoolManager), 1e18); // 1 PAXG
+        vm.deal(address(proxyLiquidityPoolManager), 2 ether); // 2ETH
+        WBTC.mint(address(proxyLiquidityPoolManager), 2e8); // 1 WBTC
+        PAXG.mint(address(proxyLiquidityPoolManager), 2e18); // 1 PAXG
 
         // Alice increases position
         console.log("Alice increasing position");
         vm.startPrank(alice);
-        TST.approve(address(pool), 50 ether);
-        EUROs.approve(address(pool), 50 ether);
-        liquidityPoolContract.increasePosition(50 ether, 50 ether);
+        TST.approve(address(pool), 9800 ether);
+        EUROs.approve(address(pool), 9800 ether);
+        liquidityPoolContract.increasePosition(9800 ether, 9800 ether);
         vm.stopPrank();
 
         // Check Alice's pending stake
@@ -120,29 +120,29 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         ) = liquidityPoolContract.getStakerPendingStakes(alice);
         assertEq(
             alicePendingTst,
-            50 ether,
-            "Alice's pending TST should be 50 ether"
+            9800 ether,
+            "Alice's pending TST should be 9800 ether"
         );
 
         console.log("Alice Euros when pending", alicePendingTst);
 
         assertEq(
             alicePendingEuros,
-            50 ether,
-            "Alice's pending EUROS should be 50 ether"
+            9800 ether,
+            "Alice's pending EUROS should be 9800 ether"
         );
 
         // Check pool balances
         console.log("Checking pool balances after Alice's deposit");
         assertEq(
             TST.balanceOf(address(pool)),
-            50 ether,
-            "Pool TST balance should be 50 ether"
+            9800 ether,
+            "Pool TST balance should be 9800 ether"
         );
         assertEq(
             EUROs.balanceOf(address(pool)),
-            50 ether,
-            "Pool EUROS balance should be 50 ether"
+            9800 ether,
+            "Pool EUROS balance should be 9800 ether"
         );
 
         // Simulate some time passing and fees accumulating
@@ -157,6 +157,9 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         EUROs.approve(address(pool), 75 ether);
         liquidityPoolContract.increasePosition(75 ether, 75 ether);
         vm.stopPrank();
+
+        // consolidate Bob pending position
+        vm.warp(block.timestamp + 25 hours);
 
         // Check Bob's pending stake
         console.log("Checking Bob's pending stake");
@@ -182,24 +185,47 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
 
         assertEq(
             alicePosition.stakedTstAmount,
-            50 ether,
-            "Alice's staked TST should be 50 ether (consolidated)"
-        );
-
-        console.log(
-            "after staking and receiving Fees",
-            alicePosition.stakedTstAmount
-        );
-
-        console.log(
-            "alicePosition stakedEurosAmount",
-            alicePosition.stakedEurosAmount
+            9800 ether,
+            "Alice's staked TST should be 9800 ether (consolidated)"
         );
 
         assertTrue(
-            alicePosition.stakedEurosAmount > 50 ether,
-            "Alice's staked EUROS should be more than 50 ether (consolidated + fees)"
+            alicePosition.stakedEurosAmount > 9800 ether,
+            "Alice's staked EUROS should be more than 9800 ether (consolidated + fees)"
         );
+
+        // Check protocol treasury balance
+        uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        assertTrue(
+            treasuryBalance > 0,
+            "Treasury should have received some fees"
+        );
+
+        // Check rewards for Alice and Bob
+        console.log("Checking rewards for Alice and Bob");
+        VaultifyStructs.Reward[] memory aliceRewards = liquidityPoolContract
+            .getStakerRewards(alice);
+
+        for (uint256 i = 0; i < aliceRewards.length; i++) {
+            console.log(
+                string.concat(
+                    "Alice's ",
+                    string(abi.encodePacked(aliceRewards[i].tokenSymbol))
+                ),
+                "Rewards: ",
+                vm.toString(aliceRewards[i].rewardAmount)
+            );
+
+            // Check Alice's position (should be consolidated now)
+            console.log("Checking Alice's consolidated position");
+            (
+                VaultifyStructs.Position memory alicePosition,
+
+            ) = liquidityPoolContract.getPosition(alice);
+
+            // NOTE: alicePosition.stakedEurosAmount = 50 EUROS staked + FeesDistribution - CosttoBuyLiquidatedAssets;
+            // TODO: test every internal function seperatly for more robust test.
+        }
 
         console.log(
             "Comprehensive increasePosition test completed successfully"

@@ -103,6 +103,7 @@ contract LiquidationPoolManager is
     }
 
     function relayLiquidatedAssetsToPool() internal {
+        bool assetsAllocated;
         // 1- Liquidate the vault that is under collatralized
         // Liquidation poool manager receives assets that has being liquidated from smart vault
         ISmartVaultManager vaultManager = ISmartVaultManager(smartVaultManager);
@@ -117,7 +118,6 @@ contract LiquidationPoolManager is
         );
 
         uint256 ethBalance;
-        bool assetsAllocated;
 
         //Allocate all the assets received by the liquitor(address(this)) and distribute them to stakers
         for (uint256 i = 0; i < _tokens.length; i++) {

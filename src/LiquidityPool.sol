@@ -24,7 +24,7 @@ contract LiquidityPool is ILiquidityPool {
     address private immutable EUROs;
     address private immutable euroUsdFeed;
 
-    uint256 public constant MINIMUM_DEPOSIT = 0.5e18;
+    uint256 public constant MINIMUM_DEPOSIT = 20e18; //
 
     address[] public stakers;
 
@@ -34,7 +34,7 @@ contract LiquidityPool is ILiquidityPool {
     bool public isEmergencyActive;
 
     mapping(address => VaultifyStructs.Position) private positions;
-    mapping(bytes => uint256) private rewards;
+    mapping(bytes => uint256) public rewards;
     mapping(address => VaultifyStructs.PendingStake) private pendingStakes;
     mapping(address => uint256) private stakersIndex;
 

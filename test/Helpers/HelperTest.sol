@@ -291,6 +291,7 @@ abstract contract HelperTest is Test {
         // standard precision provided by price oracles like Chainlink.
         priceFeedNativeUsd.setPrice(2200 * 1e8); // $2200
         priceFeedEurUsd.setPrice(11037 * 1e4); // $1.1037
+        // priceFeedEurUsd.setPrice(50000 * 1e18); // $1.1037
         priceFeedwBtcUsd.setPrice(42000 * 1e8); // $42000
         priceFeedPaxgUsd.setPrice(2000 * 1e8); // $2000
     }

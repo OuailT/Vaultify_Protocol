@@ -8,6 +8,10 @@ import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
 import {VaultifyErrors} from "src/libraries/VaultifyErrors.sol";
 import "forge-std/console.sol";
 
+// NOTE: alicePosition.stakedEurosAmount = 50 EUROS staked + FeesDistribution - CosttoBuyLiquidatedAssets;
+// TODO: test every internal function seperatly for more robust test.
+// TODO: add the rest of the test here for this comprehensive test
+
 contract LiquidityPoolTest is HelperTest, ExpectRevert {
     function setUp() public override {
         super.setUp();
@@ -17,6 +21,9 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
 
         address _user_2 = fundUserWallet(2, 10000);
         alice = _user_2;
+
+        address _user_3 = fundUserWallet(3, 10000);
+        jack = _user_3;
     }
 
     function testIncreasePosition_Success() public {
@@ -124,8 +131,6 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             "Alice's pending TST should be 9800 ether"
         );
 
-        console.log("Alice Euros when pending", alicePendingTst);
-
         assertEq(
             alicePendingEuros,
             9800 ether,
@@ -158,9 +163,6 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         liquidityPoolContract.increasePosition(75 ether, 75 ether);
         vm.stopPrank();
 
-        // consolidate Bob pending position
-        vm.warp(block.timestamp + 25 hours);
-
         // Check Bob's pending stake
         console.log("Checking Bob's pending stake");
         (uint256 bobPendingTst, uint256 bobPendingEuros) = liquidityPoolContract
@@ -189,9 +191,14 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             "Alice's staked TST should be 9800 ether (consolidated)"
         );
 
+        console.log(
+            "alicePosition stakedEurosAmount",
+            alicePosition.stakedEurosAmount
+        );
+
         assertTrue(
-            alicePosition.stakedEurosAmount > 9800 ether,
-            "Alice's staked EUROS should be more than 9800 ether (consolidated + fees)"
+            alicePosition.stakedEurosAmount < 9800 ether,
+            "Alice's staked Euros amount should be less than 9800 ether due to liquidated asset purchase"
         );
 
         // Check protocol treasury balance
@@ -201,12 +208,45 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             "Treasury should have received some fees"
         );
 
-        // Check rewards for Alice and Bob
-        console.log("Checking rewards for Alice and Bob");
+        //*** Scenario: Test when the staker deposits 9800 EUROs ***//
+        // Minimum expected rewards for each asset for a 9800 EUROs deposit
+        // NOTE: The below minimum rewards are calculated using "distributeLiquidatedAssets"
+        uint256 minEthReward = 2 ether; // 2 ETH
+        uint256 minWbtcReward = 19000000; // 19000000 / 10^8 = 0.19 WBTC
+        uint256 minPaxgReward = 0; // 0 PAXG
+
+        uint256 aliceBalinETHbefore = alice.balance;
+        uint256 aliceBalInWBTCbefore = WBTC.balanceOf(address(alice));
+        uint256 aliceBalInPAXGbefore = PAXG.balanceOf(address(alice));
+
+        /**Check rewards for Alice and Bob */
+        console.log("Checking rewards for Alice");
         VaultifyStructs.Reward[] memory aliceRewards = liquidityPoolContract
             .getStakerRewards(alice);
 
         for (uint256 i = 0; i < aliceRewards.length; i++) {
+            bytes32 assetSymbol = aliceRewards[i].tokenSymbol;
+            uint256 rewardAmount = aliceRewards[i].rewardAmount;
+
+            if (assetSymbol == bytes32("ETH")) {
+                assertTrue(
+                    rewardAmount >= minEthReward,
+                    "Alice's ETH reward should be at least 2 ETH"
+                );
+            } else if (assetSymbol == bytes32("WBTC")) {
+                assertTrue(
+                    rewardAmount >= minWbtcReward,
+                    "Alice's WBTC reward should be at least 2 WBTC"
+                );
+            } else if (assetSymbol == bytes32("PAXG")) {
+                assertTrue(
+                    rewardAmount >= minPaxgReward,
+                    "Alice's PAXG reward should be 0"
+                );
+            } else {
+                revert("Unkown asset symbol");
+            }
+
             console.log(
                 string.concat(
                     "Alice's ",
@@ -216,16 +256,112 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
                 vm.toString(aliceRewards[i].rewardAmount)
             );
 
-            // Check Alice's position (should be consolidated now)
-            console.log("Checking Alice's consolidated position");
-            (
-                VaultifyStructs.Position memory alicePosition,
+            // Alice claims rewards
+            vm.startPrank(alice);
+            liquidityPoolContract.claimRewards();
+            vm.stopPrank();
 
-            ) = liquidityPoolContract.getPosition(alice);
+            uint256 aliceEthBalanceAfter = alice.balance;
+            uint256 aliceWbtcBalanceAfter = WBTC.balanceOf(address(alice));
+            uint256 alicePaxgBalanceAfter = PAXG.balanceOf(address(alice));
 
-            // NOTE: alicePosition.stakedEurosAmount = 50 EUROS staked + FeesDistribution - CosttoBuyLiquidatedAssets;
-            // TODO: test every internal function seperatly for more robust test.
+            // For ETH balance
+            assertGe(
+                aliceEthBalanceAfter,
+                aliceBalinETHbefore + minEthReward,
+                "Alice's ETH balance should increase by the rewarded amount"
+            );
+
+            // For WBTC balance
+            assertGe(
+                aliceWbtcBalanceAfter,
+                aliceBalInWBTCbefore + minWbtcReward,
+                "Alice's WBTC balance should increase by the rewarded amount"
+            );
+
+            // For PAXG balance (assuming no PAXG rewards expected)
+            assertEq(
+                alicePaxgBalanceAfter,
+                aliceBalInPAXGbefore,
+                "Alice's PAXG balance should remain unchanged"
+            );
         }
+
+        // Simulate some time passing and fees accumulating
+        console.log("Simulating time passage and fee accumulation");
+        vm.warp(block.timestamp + 25 hours);
+        EUROs.mint(address(proxyLiquidityPoolManager), 2000 ether); // Simulate fees
+
+        /**Jack increases position, triggering consolidation, fee distribution, 
+        and asset relay for Alice and Bob */
+        {
+            vm.startPrank(jack);
+            TST.approve(address(pool), 5000 ether);
+            EUROs.approve(address(pool), 5000 ether);
+            liquidityPoolContract.increasePosition(5000 ether, 5000 ether);
+            vm.stopPrank();
+
+            // Check Bob's position (should be consolidated now)
+            console.log("Checking Jack's consolidated position");
+            (
+                VaultifyStructs.Position memory bobPosition,
+
+            ) = liquidityPoolContract.getPosition(bob);
+
+            assertEq(
+                bobPosition.stakedTstAmount,
+                75 ether,
+                "Bob's staked TST should be 75 ether (consolidated)"
+            );
+
+            assertTrue(
+                bobPosition.stakedEurosAmount < 75 ether,
+                "Bob's staked Euros amount should be less than 9800 ether due to liquidated asset purchase"
+            );
+        }
+
+        /** Check rewards for Bob*/
+        uint256 bobBalInWBTCbefore = WBTC.balanceOf(address(bob));
+
+        console.log("Checking rewards for Bob");
+        VaultifyStructs.Reward[] memory bobRewards = liquidityPoolContract
+            .getStakerRewards(bob);
+
+        for (uint256 i = 0; i < bobRewards.length; i++) {
+            console.log(
+                string.concat(
+                    "Bob's ",
+                    string(abi.encodePacked(bobRewards[i].tokenSymbol))
+                ),
+                "Rewards: ",
+                vm.toString(bobRewards[i].rewardAmount)
+            );
+
+            // NOTE: The bellow min rewards are calculated using "distributeLiquatedAssets"
+            // Bob only could only purchased liquidated WBTC
+            uint256 minWbtcReward = 244241; // 244241 / 1e8 = 0.00244241 WBTC
+
+            // Bob claims rewards
+            vm.startPrank(bob);
+            liquidityPoolContract.claimRewards();
+            vm.stopPrank();
+
+            uint256 bobWbtcBalanceAfter = WBTC.balanceOf(address(bob));
+
+            // For WBTC balance
+            assertGe(
+                bobWbtcBalanceAfter,
+                bobBalInWBTCbefore + minWbtcReward,
+                "Bob's WBTC balance should increase by the rewarded amount"
+            );
+        }
+
+        // Check protocol treasury balance
+        uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        assertTrue(
+            treasuryBalance > 0,
+            "Treasury should have received some fees"
+        );
 
         console.log(
             "Comprehensive increasePosition test completed successfully"

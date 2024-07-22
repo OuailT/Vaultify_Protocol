@@ -108,6 +108,7 @@ abstract contract HelperTest is Test {
     address internal admin = makeAddr("Admin");
     address internal alice = makeAddr("Alice");
     address internal bob = makeAddr("Bob");
+    address internal jack = makeAddr("Jack");
     address internal treasury = payable(makeAddr("Treasury"));
     address internal liquidator = makeAddr("Liquidator");
     address internal vaultManager = makeAddr("SmartVaultManager");

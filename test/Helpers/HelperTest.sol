@@ -124,6 +124,11 @@ abstract contract HelperTest is Test {
         bytes32 _native = bytes32(abi.encodePacked("ETH"));
         native = _native;
 
+        vm.label(admin, "ADMIN");
+        vm.label(alice, "ALICE");
+        vm.label(bob, "BOB");
+        vm.label(jack, "JACK");
+
         vm.startPrank(admin);
 
         // Deploy Collateral assets contracts //

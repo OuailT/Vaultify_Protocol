@@ -113,8 +113,7 @@ contract LiquidityPool is ILiquidityPool {
             );
         }
 
-        // READ FROM THE STORAGE ONCE
-        VaultifyStructs.PendingStake storage stake = pendingStakes[msg.sender];
+        VaultifyStructs.PendingStake memory stake = pendingStakes[msg.sender];
 
         VaultifyStructs.PendingStake memory updatePendingStake = VaultifyStructs
             .PendingStake({
@@ -146,35 +145,28 @@ contract LiquidityPool is ILiquidityPool {
     ) external onlyWhenNotEmergency {
         ILiquidationPoolManager(poolManager).allocateFeesAndAssetsToPool();
 
-        // READ from memory
-        VaultifyStructs.Position memory _stakerPosition = positions[msg.sender];
+        uint256 stakedTst = _stakerPosition.stakedTstAmount;
+        uint256 stakedEuros = _stakerPosition.stakedEurosAmount;
 
         // Check if the user has enough tst or Euros tokens to remove from it position
-
         if (
-            _stakerPosition.stakedTstAmount < _tstVal &&
-            _stakerPosition.stakedEurosAmount < _eurosVal
+            positions[msg.sender].stakedTstAmount < _tstVal &&
+            positions[msg.sender].stakedEurosAmount < _eurosVal
         ) revert VaultifyErrors.InvalidDecrementAmount();
 
         if (_tstVal > 0) {
             IERC20(TST).safeTransfer(msg.sender, _tstVal);
-            unchecked {
-                _stakerPosition.stakedTstAmount -= _tstVal;
-            }
+
+            positions[msg.sender].stakedTstAmount -= _tstVal;
         }
 
         if (_eurosVal > 0) {
             IERC20(EUROs).safeTransfer(msg.sender, _eurosVal);
-            unchecked {
-                _stakerPosition.stakedEurosAmount -= _eurosVal;
-            }
+
+            positions[msg.sender].stakedEurosAmount -= _eurosVal;
         }
 
-        // create function to check if the positon is Empty
-        if (
-            _stakerPosition.stakedTstAmount == 0 &&
-            _stakerPosition.stakedEurosAmount == 0
-        ) {
+        if (stakedTst == 0 && stakedEuros == 0) {
             deletePosition(_stakerPosition.stakerAddress);
         }
 
@@ -361,6 +353,8 @@ contract LiquidityPool is ILiquidityPool {
                             // Keep track of totalAmount of purchased ETH by the user to use it to get any leftovers.
                             nativePurchased += _portion;
                         } else {
+                            // transferring  portion of tokens FROM the poolManager TO
+                            // the LiquidityPool contract (address(this)) to be claimed later
                             IERC20(asset.token.addr).safeTransferFrom(
                                 poolManager,
                                 address(this),
@@ -396,7 +390,7 @@ contract LiquidityPool is ILiquidityPool {
         VaultifyStructs.Asset[] memory _assets,
         uint256 _nativePurchased
     ) private {
-        // Loop throught all the the assets until _asset.token.addr == address(0)
+        // Loop throught all the the liquidated assets until _asset.token.addr == address(0)
         // if so check of there any leftovers
         for (uint256 i = 0; i < _assets.length; i++) {
             address _assetAddr = _assets[i].token.addr;
@@ -406,7 +400,7 @@ contract LiquidityPool is ILiquidityPool {
                 (bool sent, ) = poolManager.call{
                     value: _assets[i].amount - _nativePurchased
                 }("");
-                require(sent);
+                if (!sent) revert VaultifyErrors.NativeTxFailed();
             }
         }
     }

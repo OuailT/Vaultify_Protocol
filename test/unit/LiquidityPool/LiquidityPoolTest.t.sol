@@ -339,7 +339,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
 
             // NOTE: The bellow min rewards are calculated using "distributeLiquatedAssets"
             // Bob only could only purchased liquidated WBTC
-            uint256 minWbtcReward = 244241; // 244241 / 1e8 = 0.00244241 WBTC
+            uint256 bobMinWbtcReward = 244241; // 244241 / 1e8 = 0.00244241 WBTC
 
             // Bob claims rewards
             vm.startPrank(bob);
@@ -351,13 +351,13 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             // For WBTC balance
             assertGe(
                 bobWbtcBalanceAfter,
-                bobBalInWBTCbefore + minWbtcReward,
+                bobBalInWBTCbefore + bobMinWbtcReward,
                 "Bob's WBTC balance should increase by the rewarded amount"
             );
         }
 
         // Check protocol treasury balance
-        uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        treasuryBalance = EUROs.balanceOf(protocolTreasury);
         assertTrue(
             treasuryBalance > 0,
             "Treasury should have received some fees"
@@ -365,6 +365,169 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
 
         console.log(
             "Comprehensive increasePosition test completed successfully"
+        );
+    }
+
+    function testComprehensiveDecreasePosition() public {
+        console.log("Starting comprehensive decreasePosition test");
+
+        // First, run the increasePosition test to set up the initial state
+        testComprehensiveIncreasePosition();
+
+        console.log(
+            "Initial state set up completed, proceeding with decrease tests"
+        );
+
+        // Alice decreases her entire position
+        console.log("Alice decreasing position");
+
+        vm.startPrank(alice);
+
+        (
+            VaultifyStructs.Position memory alicePositionBefore,
+
+        ) = liquidityPoolContract.getPosition(alice);
+
+        console.log(
+            "Alice tst before Full withdraw of TST",
+            alicePositionBefore.stakedTstAmount
+        );
+
+        liquidityPoolContract.decreasePosition(
+            alicePositionBefore.stakedTstAmount,
+            alicePositionBefore.stakedEurosAmount
+        );
+        vm.stopPrank();
+
+        // Check Alice's position after decrease
+        console.log("Checking Alice's position after decrease");
+        (
+            VaultifyStructs.Position memory alicePositionAfter,
+
+        ) = liquidityPoolContract.getPosition(alice);
+
+        console.log(
+            "alicePositionAfter stakedTstAmount",
+            alicePositionAfter.stakedTstAmount
+        );
+        assertEq(
+            alicePositionAfter.stakedTstAmount,
+            0,
+            "Alice's staked TST should be 0 after full withdrawal"
+        );
+        assertEq(
+            alicePositionAfter.stakedEurosAmount,
+            0,
+            "Alice's staked EUROS should be 0 after full withdrawal"
+        );
+
+        // TODO Check that alice position has been deleteted.
+
+        // @audit-info Bob decreases half of his position
+        // console.log("Bob decreasing half of his position");
+        // vm.startPrank(bob);
+        // (VaultifyStructs.Position memory bobPosition, ) = liquidityPoolContract
+        //     .getPosition(bob);
+        // uint256 bobHalfTst = bobPosition.stakedTstAmount / 2;
+        // uint256 bobHalfEuros = bobPosition.stakedEurosAmount / 2;
+        // liquidityPoolContract.decreasePosition(bobHalfTst, bobHalfEuros);
+        // vm.stopPrank();
+
+        // // Check Bob's position after decrease
+        // console.log("Checking Bob's position after decrease");
+        // (bobPosition, ) = liquidityPoolContract.getPosition(bob);
+        // assertEq(
+        //     bobPosition.stakedTstAmount,
+        //     bobHalfTst,
+        //     "Bob's staked TST should be half of original amount"
+        // );
+        // assertEq(
+        //     bobPosition.stakedEurosAmount,
+        //     bobHalfEuros,
+        //     "Bob's staked EUROS should be half of original amount"
+        // );
+
+        // // Simulate some time passing and fees accumulating
+        // console.log("Simulating time passage and fee accumulation");
+        // vm.warp(block.timestamp + 25 hours);
+        // EUROs.mint(address(proxyLiquidityPoolManager), 1000 ether); // Simulate fees
+
+        // // Jack increases position, triggering consolidation and fee distribution
+        // console.log("Jack increasing position");
+        // vm.startPrank(jack);
+        // TST.approve(address(pool), 1000 ether);
+        // EUROs.approve(address(pool), 1000 ether);
+        // liquidityPoolContract.increasePosition(1000 ether, 1000 ether);
+        // vm.stopPrank();
+
+        // // Check Jack's position
+        // console.log("Checking Jack's position");
+        // (VaultifyStructs.Position memory jackPosition, ) = liquidityPoolContract
+        //     .getPosition(jack);
+        // assertEq(
+        //     jackPosition.stakedTstAmount,
+        //     6000 ether,
+        //     "Jack's staked TST should be 6000 ether"
+        // );
+        // assertTrue(
+        //     jackPosition.stakedEurosAmount < 6000 ether,
+        //     "Jack's staked EUROS should be less than 6000 ether due to liquidated asset purchase"
+        // );
+
+        // // Check rewards for Jack
+        // console.log("Checking rewards for Jack");
+        // VaultifyStructs.Reward[] memory jackRewards = liquidityPoolContract
+        //     .getStakerRewards(jack);
+        // for (uint256 i = 0; i < jackRewards.length; i++) {
+        //     console.log(
+        //         string.concat(
+        //             "Jack's ",
+        //             string(abi.encodePacked(jackRewards[i].tokenSymbol))
+        //         ),
+        //         "Rewards: ",
+        //         vm.toString(jackRewards[i].rewardAmount)
+        //     );
+
+        //     // NOTE: Uncomment and fill in the expected minimum rewards based on your calculations
+        //     // uint256 minEthReward = /* Add your calculated value here */;
+        //     // uint256 minWbtcReward = /* Add your calculated value here */;
+        //     // uint256 minPaxgReward = /* Add your calculated value here */;
+
+        //     // Add assertions for Jack's rewards here
+        //     // assertTrue(jackRewards[i].rewardAmount >= minEthReward, "Jack's ETH reward should be at least the minimum");
+        //     // assertTrue(jackRewards[i].rewardAmount >= minWbtcReward, "Jack's WBTC reward should be at least the minimum");
+        //     // assertTrue(jackRewards[i].rewardAmount >= minPaxgReward, "Jack's PAXG reward should be at least the minimum");
+        // }
+
+        // // Jack claims rewards
+        // vm.startPrank(jack);
+        // uint256 jackEthBalanceBefore = jack.balance;
+        // uint256 jackWbtcBalanceBefore = WBTC.balanceOf(address(jack));
+        // uint256 jackPaxgBalanceBefore = PAXG.balanceOf(address(jack));
+
+        // liquidityPoolContract.claimRewards();
+
+        // uint256 jackEthBalanceAfter = jack.balance;
+        // uint256 jackWbtcBalanceAfter = WBTC.balanceOf(address(jack));
+        // uint256 jackPaxgBalanceAfter = PAXG.balanceOf(address(jack));
+
+        // // Assert Jack's balance changes
+        // // NOTE: Uncomment and adjust these assertions based on your expected rewards
+        // // assertGe(jackEthBalanceAfter, jackEthBalanceBefore + minEthReward, "Jack's ETH balance should increase by the rewarded amount");
+        // // assertGe(jackWbtcBalanceAfter, jackWbtcBalanceBefore + minWbtcReward, "Jack's WBTC balance should increase by the rewarded amount");
+        // // assertGe(jackPaxgBalanceAfter, jackPaxgBalanceBefore + minPaxgReward, "Jack's PAXG balance should increase by the rewarded amount");
+
+        // vm.stopPrank();
+
+        // // Check protocol treasury balance
+        // uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        // assertTrue(
+        //     treasuryBalance > 0,
+        //     "Treasury should have received some fees"
+        // );
+
+        console.log(
+            "Comprehensive decreasePosition test completed successfully"
         );
     }
 }

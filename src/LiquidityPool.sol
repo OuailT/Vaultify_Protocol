@@ -145,32 +145,48 @@ contract LiquidityPool is ILiquidityPool {
     ) external onlyWhenNotEmergency {
         ILiquidationPoolManager(poolManager).allocateFeesAndAssetsToPool();
 
-        uint256 stakedTst = _stakerPosition.stakedTstAmount;
-        uint256 stakedEuros = _stakerPosition.stakedEurosAmount;
+        // get the current user position from the storage.
+        VaultifyStructs.Position storage currentPosition = positions[
+            msg.sender
+        ];
 
-        // Check if the user has enough tst or Euros tokens to remove from it position
+        // calculate the maximum amounts that can be withdrawn
+        uint256 maxTstWithdrawal = currentPosition.stakedTstAmount;
+        uint256 maxEurosWithdrawal = currentPosition.stakedEurosAmount;
+
+        // Adjust withdrawal amounts if they exceed the current stake
+        uint256 tstToWithdraw = _tstVal > maxTstWithdrawal
+            ? maxTstWithdrawal
+            : _tstVal;
+
+        uint256 eurosToWithdraw = _eurosVal > maxEurosWithdrawal
+            ? maxEurosWithdrawal
+            : _eurosVal;
+
+        // Perform withdrawals
+        if (tstToWithdraw > 0) {
+            currentPosition.stakedTstAmount -= tstToWithdraw;
+            IERC20(TST).safeTransfer(msg.sender, tstToWithdraw);
+        }
+
+        if (eurosToWithdraw > 0) {
+            currentPosition.stakedEurosAmount -= eurosToWithdraw;
+            IERC20(EUROs).safeTransfer(msg.sender, eurosToWithdraw);
+        }
+
+        // Check if position should be deleted
         if (
-            positions[msg.sender].stakedTstAmount < _tstVal &&
-            positions[msg.sender].stakedEurosAmount < _eurosVal
-        ) revert VaultifyErrors.InvalidDecrementAmount();
-
-        if (_tstVal > 0) {
-            IERC20(TST).safeTransfer(msg.sender, _tstVal);
-
-            positions[msg.sender].stakedTstAmount -= _tstVal;
+            currentPosition.stakedTstAmount == 0 &&
+            currentPosition.stakedEurosAmount == 0
+        ) {
+            deletePosition(msg.sender);
         }
 
-        if (_eurosVal > 0) {
-            IERC20(EUROs).safeTransfer(msg.sender, _eurosVal);
-
-            positions[msg.sender].stakedEurosAmount -= _eurosVal;
-        }
-
-        if (stakedTst == 0 && stakedEuros == 0) {
-            deletePosition(_stakerPosition.stakerAddress);
-        }
-
-        emit VaultifyEvents.positionDecreased(msg.sender, _tstVal, _eurosVal);
+        emit VaultifyEvents.positionDecreased(
+            msg.sender,
+            tstToWithdraw,
+            eurosToWithdraw
+        );
     }
 
     // NOTE: change visibility from private to external for testing

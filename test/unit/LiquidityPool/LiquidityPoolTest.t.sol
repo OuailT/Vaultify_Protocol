@@ -371,7 +371,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
     function testComprehensiveDecreasePosition() public {
         console.log("Starting comprehensive decreasePosition test");
 
-        // First, run the increasePosition test to set up the initial state
+        // First, run the increasePosition test to set up the initial states
         testComprehensiveIncreasePosition();
 
         console.log(
@@ -393,11 +393,43 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             alicePositionBefore.stakedTstAmount
         );
 
+        // Alic's staked amount before decreasing her position
+        uint256 aliceInitialStakedTST = alicePositionBefore.stakedTstAmount;
+        uint256 aliceInitialStakedEuros = alicePositionBefore.stakedTstAmount;
+
+        // Alice Balance in TST and EUROS before decreasing her position
+        uint256 aliceTstBalanceBefore = TST.balanceOf(alice);
+        uint256 aliceEurosBalanceBefore = EUROs.balanceOf(alice);
+
+        console.log("alice TstBalance Before", aliceTstBalanceBefore / 1e18);
+        console.log(
+            "alice EurosBalance Before",
+            aliceEurosBalanceBefore / 1e18
+        );
+
         liquidityPoolContract.decreasePosition(
             alicePositionBefore.stakedTstAmount,
             alicePositionBefore.stakedEurosAmount
         );
         vm.stopPrank();
+
+        // Alice Balance in TST and EUROS after decreasing her position
+        uint256 aliceTstBalanceAfter = TST.balanceOf(alice);
+        uint256 aliceEurosBalanceAfter = EUROs.balanceOf(alice);
+
+        // Check Alice's TST balance after position decrease
+        assertEq(
+            aliceInitialStakedTST + aliceTstBalanceBefore,
+            aliceTstBalanceAfter,
+            "Alice's TST balance incorrect after position decrease"
+        );
+
+        // Check Alice's euro balance after position decrease/ assets purchased
+        assertEq(
+            aliceEurosBalanceBefore,
+            aliceEurosBalanceAfter,
+            "Alice's euro balance should remain unchanged after position decrease/assets purchase"
+        );
 
         // Check Alice's position after decrease
         console.log("Checking Alice's position after decrease");
@@ -421,31 +453,57 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             "Alice's staked EUROS should be 0 after full withdrawal"
         );
 
-        // TODO Check that alice position has been deleteted.
+        assertEq(
+            alicePositionAfter.stakerAddress,
+            address(0),
+            "Alice's position should be deleted after a full withdrawl"
+        );
 
         // @audit-info Bob decreases half of his position
-        // console.log("Bob decreasing half of his position");
-        // vm.startPrank(bob);
-        // (VaultifyStructs.Position memory bobPosition, ) = liquidityPoolContract
-        //     .getPosition(bob);
-        // uint256 bobHalfTst = bobPosition.stakedTstAmount / 2;
-        // uint256 bobHalfEuros = bobPosition.stakedEurosAmount / 2;
-        // liquidityPoolContract.decreasePosition(bobHalfTst, bobHalfEuros);
-        // vm.stopPrank();
+        console.log("Bob decreasing half of his position");
+        vm.startPrank(bob);
+        (
+            VaultifyStructs.Position memory bobPositionBefore,
 
-        // // Check Bob's position after decrease
-        // console.log("Checking Bob's position after decrease");
-        // (bobPosition, ) = liquidityPoolContract.getPosition(bob);
-        // assertEq(
-        //     bobPosition.stakedTstAmount,
-        //     bobHalfTst,
-        //     "Bob's staked TST should be half of original amount"
-        // );
-        // assertEq(
-        //     bobPosition.stakedEurosAmount,
-        //     bobHalfEuros,
-        //     "Bob's staked EUROS should be half of original amount"
-        // );
+        ) = liquidityPoolContract.getPosition(bob);
+        uint256 bobHalfTst = bobPositionBefore.stakedTstAmount / 2;
+        uint256 bobHalfEuros = bobPositionBefore.stakedEurosAmount / 2;
+        liquidityPoolContract.decreasePosition(bobHalfTst, bobHalfEuros);
+        vm.stopPrank();
+
+        console.log("Checking rewards for Bob after decrease");
+        VaultifyStructs.Reward[] memory bobRewardsAfter = liquidityPoolContract
+            .getStakerRewards(bob);
+
+        for (uint256 i = 0; i < bobRewardsAfter.length; i++) {
+            console.log(
+                string.concat(
+                    "Bob's ",
+                    string(abi.encodePacked(bobRewardsAfter[i].tokenSymbol))
+                ),
+                "Rewards: ",
+                vm.toString((bobRewardsAfter[i].rewardAmount / 10) ^ 8)
+            );
+        }
+
+        // Check Bob's position after decrease
+        console.log("Checking Bob's position after decrease");
+        (
+            VaultifyStructs.Position memory bobPositionAfter,
+
+        ) = liquidityPoolContract.getPosition(bob);
+
+        assertEq(
+            bobPositionAfter.stakedTstAmount,
+            bobHalfTst,
+            "Bob's staked TST should be half of original amount"
+        );
+
+        assertLe(
+            bobPositionAfter.stakedEurosAmount,
+            bobHalfEuros,
+            "Bob's staked EUROS should be less than of original amount due to position decrease, assets purched"
+        );
 
         // // Simulate some time passing and fees accumulating
         // console.log("Simulating time passage and fee accumulation");

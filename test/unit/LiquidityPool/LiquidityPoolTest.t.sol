@@ -471,18 +471,43 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         liquidityPoolContract.decreasePosition(bobHalfTst, bobHalfEuros);
         vm.stopPrank();
 
+        // HERE
         console.log("Checking rewards for Bob after decrease");
-        VaultifyStructs.Reward[] memory bobRewardsAfter = liquidityPoolContract
+        /** Check alice balance for Bob before decrease*/
+        uint256 bobBalanceInWBTCBef = WBTC.balanceOf(bob);
+
+        console.log("Checking rewards for Bob");
+        VaultifyStructs.Reward[] memory bobRewards = liquidityPoolContract
             .getStakerRewards(bob);
 
-        for (uint256 i = 0; i < bobRewardsAfter.length; i++) {
+        for (uint256 i = 0; i < bobRewards.length; i++) {
             console.log(
                 string.concat(
                     "Bob's ",
-                    string(abi.encodePacked(bobRewardsAfter[i].tokenSymbol))
+                    string(abi.encodePacked(bobRewards[i].tokenSymbol))
                 ),
                 "Rewards: ",
-                vm.toString((bobRewardsAfter[i].rewardAmount / 10) ^ 8)
+                vm.toString(bobRewards[i].rewardAmount)
+            );
+
+            // NOTE: The bellow min rewards are calculated using "distributeLiquatedAssets
+            // check Bob rewrads after decreasing half of his stake.
+            uint256 bobMinWbtcReward = 2253; // 2253 / 1e8 = 0.00002253 WTBC
+
+            // Bob claims rewards
+            vm.startPrank(bob);
+            liquidityPoolContract.claimRewards();
+            vm.stopPrank();
+
+            console.log("alice ETh after reward claimin", bob.balance);
+
+            uint256 bobBalanceInWBTCafter = WBTC.balanceOf(bob);
+
+            // For WBTC balance
+            assertGe(
+                bobBalanceInWBTCafter,
+                bobBalanceInWBTCBef + bobMinWbtcReward,
+                "Bob's WBTC balance should increase by the rewarded amount"
             );
         }
 
@@ -506,86 +531,169 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         );
 
         // // Simulate some time passing and fees accumulating
-        // console.log("Simulating time passage and fee accumulation");
-        // vm.warp(block.timestamp + 25 hours);
-        // EUROs.mint(address(proxyLiquidityPoolManager), 1000 ether); // Simulate fees
+        console.log("Simulating time passage and fee accumulation");
+        vm.warp(block.timestamp + 25 hours);
+        EUROs.mint(address(proxyLiquidityPoolManager), 1000 ether); // Simulate fees
 
         // // Jack increases position, triggering consolidation and fee distribution
-        // console.log("Jack increasing position");
-        // vm.startPrank(jack);
-        // TST.approve(address(pool), 1000 ether);
-        // EUROs.approve(address(pool), 1000 ether);
-        // liquidityPoolContract.increasePosition(1000 ether, 1000 ether);
-        // vm.stopPrank();
+        console.log("Jack increasing position");
+        vm.startPrank(jack);
+        TST.approve(address(pool), 1000 ether);
+        EUROs.approve(address(pool), 1000 ether);
+        liquidityPoolContract.increasePosition(1000 ether, 1000 ether);
+        vm.stopPrank();
 
         // // Check Jack's position
         // console.log("Checking Jack's position");
-        // (VaultifyStructs.Position memory jackPosition, ) = liquidityPoolContract
-        //     .getPosition(jack);
-        // assertEq(
-        //     jackPosition.stakedTstAmount,
-        //     6000 ether,
-        //     "Jack's staked TST should be 6000 ether"
-        // );
-        // assertTrue(
-        //     jackPosition.stakedEurosAmount < 6000 ether,
-        //     "Jack's staked EUROS should be less than 6000 ether due to liquidated asset purchase"
-        // );
+        (VaultifyStructs.Position memory jackPosition, ) = liquidityPoolContract
+            .getPosition(jack);
+        assertEq(
+            jackPosition.stakedTstAmount,
+            6000 ether,
+            "Jack's staked TST should be 6000 ether"
+        );
+        assertTrue(
+            jackPosition.stakedEurosAmount < 6000 ether,
+            "Jack's staked EUROS should be less than 6000 ether due to liquidated asset purchase"
+        );
 
-        // // Check rewards for Jack
-        // console.log("Checking rewards for Jack");
-        // VaultifyStructs.Reward[] memory jackRewards = liquidityPoolContract
-        //     .getStakerRewards(jack);
-        // for (uint256 i = 0; i < jackRewards.length; i++) {
-        //     console.log(
-        //         string.concat(
-        //             "Jack's ",
-        //             string(abi.encodePacked(jackRewards[i].tokenSymbol))
-        //         ),
-        //         "Rewards: ",
-        //         vm.toString(jackRewards[i].rewardAmount)
-        //     );
-
-        //     // NOTE: Uncomment and fill in the expected minimum rewards based on your calculations
-        //     // uint256 minEthReward = /* Add your calculated value here */;
-        //     // uint256 minWbtcReward = /* Add your calculated value here */;
-        //     // uint256 minPaxgReward = /* Add your calculated value here */;
-
-        //     // Add assertions for Jack's rewards here
-        //     // assertTrue(jackRewards[i].rewardAmount >= minEthReward, "Jack's ETH reward should be at least the minimum");
-        //     // assertTrue(jackRewards[i].rewardAmount >= minWbtcReward, "Jack's WBTC reward should be at least the minimum");
-        //     // assertTrue(jackRewards[i].rewardAmount >= minPaxgReward, "Jack's PAXG reward should be at least the minimum");
-        // }
+        // Check rewards for Jack
+        console.log("Checking rewards for Jack");
+        VaultifyStructs.Reward[] memory jackRewards = liquidityPoolContract
+            .getStakerRewards(jack);
+        for (uint256 i = 0; i < jackRewards.length; i++) {
+            console.log(
+                string.concat(
+                    "Jack's ",
+                    string(abi.encodePacked(jackRewards[i].tokenSymbol))
+                ),
+                "Rewards: ",
+                vm.toString(jackRewards[i].rewardAmount)
+            );
+        }
 
         // // Jack claims rewards
-        // vm.startPrank(jack);
-        // uint256 jackEthBalanceBefore = jack.balance;
-        // uint256 jackWbtcBalanceBefore = WBTC.balanceOf(address(jack));
-        // uint256 jackPaxgBalanceBefore = PAXG.balanceOf(address(jack));
+        uint256 jackMinWbtcReward = 17833331;
 
-        // liquidityPoolContract.claimRewards();
+        vm.startPrank(jack);
+        uint256 jackWbtcBalanceBefore = WBTC.balanceOf(address(jack));
 
-        // uint256 jackEthBalanceAfter = jack.balance;
-        // uint256 jackWbtcBalanceAfter = WBTC.balanceOf(address(jack));
-        // uint256 jackPaxgBalanceAfter = PAXG.balanceOf(address(jack));
+        liquidityPoolContract.claimRewards();
 
-        // // Assert Jack's balance changes
-        // // NOTE: Uncomment and adjust these assertions based on your expected rewards
-        // // assertGe(jackEthBalanceAfter, jackEthBalanceBefore + minEthReward, "Jack's ETH balance should increase by the rewarded amount");
-        // // assertGe(jackWbtcBalanceAfter, jackWbtcBalanceBefore + minWbtcReward, "Jack's WBTC balance should increase by the rewarded amount");
-        // // assertGe(jackPaxgBalanceAfter, jackPaxgBalanceBefore + minPaxgReward, "Jack's PAXG balance should increase by the rewarded amount");
+        uint256 jackWbtcBalanceAfter = WBTC.balanceOf(address(jack));
 
-        // vm.stopPrank();
+        // Assert Jack's balance changes
+        assertGe(
+            jackWbtcBalanceAfter,
+            jackWbtcBalanceBefore + jackMinWbtcReward,
+            "Jack's WBTC balance should increase by the rewarded amount"
+        );
 
-        // // Check protocol treasury balance
-        // uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
-        // assertTrue(
-        //     treasuryBalance > 0,
-        //     "Treasury should have received some fees"
-        // );
+        vm.stopPrank();
+
+        // Check protocol treasury balance
+        uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        assertTrue(
+            treasuryBalance > 0,
+            "Treasury should have received some fees"
+        );
 
         console.log(
             "Comprehensive decreasePosition test completed successfully"
+        );
+    }
+
+    function testComprehensiveEmergencyWithdraw() public {
+        console.log("Starting comprehensive emergencyWithdraw test");
+
+        // First, run the increasePosition test to set up the initial state
+        testComprehensiveIncreasePosition();
+
+        console.log(
+            "Initial state set up completed, proceeding with emergency withdraw tests"
+        );
+
+        // Simulate emergency state
+        vm.startPrank(address(proxyLiquidityPoolManager));
+        liquidityPoolContract.setEmergencyState(true);
+        vm.stopPrank();
+
+        // Test Alice's emergency withdraw
+        _testEmergencyWithdraw(alice);
+
+        // Test Bob's emergency withdraw
+        _testEmergencyWithdraw(bob);
+
+        console.log(
+            "Comprehensive emergencyWithdraw test completed successfully"
+        );
+    }
+
+    function _testEmergencyWithdraw(address user) private {
+        console.log("Testing emergency withdraw for user", user);
+
+        // Store initial balances
+        uint256 initialEurosBalance = EUROs.balanceOf(user);
+        uint256 initialTstBalance = TST.balanceOf(user);
+
+        // Store initial position and pending stakes
+        (
+            VaultifyStructs.Position memory initialPosition,
+
+        ) = liquidityPoolContract.getPosition(user);
+        (
+            uint256 initialPendingTst,
+            uint256 initialPendingEuros
+        ) = liquidityPoolContract.getStakerPendingStakes(user);
+
+        // Perform emergency withdraw
+        vm.prank(user);
+        liquidityPoolContract.emergencyWithdraw();
+
+        // Check final balances
+        uint256 finalEurosBalance = EUROs.balanceOf(user);
+        uint256 finalTstBalance = TST.balanceOf(user);
+
+        assertEq(
+            finalEurosBalance,
+            initialEurosBalance +
+                initialPosition.stakedEurosAmount +
+                initialPendingEuros,
+            "EUROS balance should include staked and pending amounts"
+        );
+        assertEq(
+            finalTstBalance,
+            initialTstBalance +
+                initialPosition.stakedTstAmount +
+                initialPendingTst,
+            "TST balance should include staked and pending amounts"
+        );
+
+        // Check position and pending stakes after emergency withdraw
+        vm.expectRevert(); // Expect revert when trying to access a deleted position
+        liquidityPoolContract.getPosition(user);
+
+        (
+            uint256 finalPendingTst,
+            uint256 finalPendingEuros
+        ) = liquidityPoolContract.getStakerPendingStakes(user);
+        assertEq(
+            finalPendingTst,
+            0,
+            "Pending TST should be 0 after emergency withdraw"
+        );
+        assertEq(
+            finalPendingEuros,
+            0,
+            "Pending EUROS should be 0 after emergency withdraw"
+        );
+
+        // Check event emission
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EmergencyWithdrawal(
+            user,
+            initialPosition.stakedEurosAmount + initialPendingEuros,
+            initialPosition.stakedTstAmount + initialPendingTst
         );
     }
 }

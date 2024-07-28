@@ -2,29 +2,38 @@
 pragma solidity ^0.8.22;
 
 library VaultifyEvents {
-    //** smartVaultManager.sol Event **//
+    // SmartVaultManager.sol Events
     event VaultDeployed(
         address indexed vaultAddress,
         address indexed owner,
-        address vaultTokenType,
+        address indexed vaultTokenType,
         uint256 tokenId
     );
 
     event VaultLiquidated(address indexed vaultAddress);
-    event VaultTransferred(uint256 indexed tokenId, address from, address to);
 
-    //** smartVault.sol Event **//
-    /// @notice Emitted when collateral is removed from the vault.
-    event CollateralRemoved(bytes32 symbol, uint256 amount, address to);
+    event VaultTransferred(
+        uint256 indexed tokenId,
+        address indexed from,
+        address indexed to
+    );
 
-    /// @notice Emitted when an asset is removed from the vault.
-    event AssetRemoved(address token, uint256 amount, address to);
+    // SmartVault.sol Events
+    event CollateralRemoved(
+        bytes32 indexed symbol,
+        uint256 amount,
+        address indexed to
+    );
 
-    /// @notice Emitted when EUROs are minted.
-    event EUROsMinted(address to, uint256 amount, uint256 fee);
+    event AssetRemoved(
+        address indexed token,
+        uint256 amount,
+        address indexed to
+    );
 
-    /// @notice Emitted when EUROs are burned.
-    event EUROsBurned(uint256 amount, uint256 fee);
+    event EUROsMinted(address indexed to, uint256 amount, uint256 fee);
+
+    event EUROsBurned(address indexed from, uint256 amount, uint256 fee);
 
     event ERC20SwapExecuted(
         uint256 amountIn,
@@ -38,36 +47,38 @@ library VaultifyEvents {
         uint256 amountOut
     );
 
-    event FullRepayment(address from, uint256 fee);
+    event FullRepayment(address indexed from, uint256 fee);
 
     event NativeCollateralRemoved(
-        bytes32 _symbol,
-        uint256 _amount,
-        address _to
+        bytes32 indexed symbol,
+        uint256 amount,
+        address indexed to
     );
 
-    event ERC20CollateralRemoved(bytes32 _symbol, uint256 _amount, address _to);
+    event ERC20CollateralRemoved(
+        bytes32 indexed symbol,
+        uint256 amount,
+        address indexed to
+    );
 
     event PositionIncreased(
-        address staker,
+        address indexed staker,
         uint256 createdAt,
         uint256 tstValue,
         uint256 eurosValue
     );
 
-    event positionDecreased(
-        address staker,
+    event PositionDecreased(
+        address indexed staker,
         uint256 tstValue,
         uint256 eurosValue
     );
 
-    event EmergencyStateChanged(bool emergencyState);
+    event EmergencyStateChanged(bool indexed emergencyState);
 
     event EmergencyWithdrawal(
-        address staker,
+        address indexed staker,
         uint256 totalEuros,
         uint256 totalTst
     );
-
-    event VaultTransferred(uint256 _tokenId, uint256 _from, uint256 _to);
 }

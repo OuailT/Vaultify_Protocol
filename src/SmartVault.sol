@@ -381,7 +381,7 @@ contract SmartVault is ISmartVault {
             fee
         );
 
-        emit VaultifyEvents.EUROsBurned(amountToBurn, fee);
+        emit VaultifyEvents.EUROsBurned(msg.sender, amountToBurn, fee);
     }
 
     /**

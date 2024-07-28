@@ -87,9 +87,12 @@ contract LiquidityPool is ILiquidityPool {
             "Deposit must exceed minimum requirement"
         );
 
-        // Check if the contract has allowance to transfer both tokens
-        bool isTstApproved = IERC20(TST).allowance(msg.sender, address(this)) >=
-            _tstVal;
+        if (_tstVal < MINIMUM_DEPOSIT || _eurosVal < MINIMUM_DEPOSIT)
+            // Check if the contract has allowance to transfer both tokens
+            bool isTstApproved = IERC20(TST).allowance(
+                msg.sender,
+                address(this)
+            ) >= _tstVal;
 
         bool isEurosApproved = IERC20(EUROs).allowance(
             msg.sender,
@@ -182,7 +185,7 @@ contract LiquidityPool is ILiquidityPool {
             deletePosition(msg.sender);
         }
 
-        emit VaultifyEvents.positionDecreased(
+        emit VaultifyEvents.PositionDecreased(
             msg.sender,
             tstToWithdraw,
             eurosToWithdraw
@@ -397,6 +400,7 @@ contract LiquidityPool is ILiquidityPool {
         returnExcessETH(_assets, nativePurchased);
     }
 
+    // @audit-info change visibility back to private when the test is finished
     // function that ETH left over after stakers purchased
     /// @notice Returns excess ETH to the pool manager after asset distribution
     /// @dev This function is called internally after distributing liquidated assets
@@ -405,17 +409,18 @@ contract LiquidityPool is ILiquidityPool {
     function returnExcessETH(
         VaultifyStructs.Asset[] memory _assets,
         uint256 _nativePurchased
-    ) private {
+    ) public {
         // Loop throught all the the liquidated assets until _asset.token.addr == address(0)
         // if so check of there any leftovers
         for (uint256 i = 0; i < _assets.length; i++) {
             address _assetAddr = _assets[i].token.addr;
             bytes32 _assetSymbol = _assets[i].token.symbol;
+            uint256 excessAmount = _assets[i].amount > _nativePurchased
+                ? _assets[i].amount - _nativePurchased
+                : 0;
 
             if (_assetAddr == address(0) && _assetSymbol != bytes32(0)) {
-                (bool sent, ) = poolManager.call{
-                    value: _assets[i].amount - _nativePurchased
-                }("");
+                (bool sent, ) = poolManager.call{value: excessAmount}("");
                 if (!sent) revert VaultifyErrors.NativeTxFailed();
             }
         }
@@ -444,7 +449,10 @@ contract LiquidityPool is ILiquidityPool {
                     }("");
                     if (!sent) revert VaultifyErrors.NativeTxFailed();
                 } else {
-                    IERC20(_token.addr).transfer(msg.sender, _rewardsAmount);
+                    IERC20(_token.addr).safeTransfer(
+                        msg.sender,
+                        _rewardsAmount
+                    );
                 }
             }
         }
@@ -578,6 +586,7 @@ contract LiquidityPool is ILiquidityPool {
         _rewards = getStakerRewards(_staker);
     }
 
+    // TODO: add re entrancy modifier
     // function that allow user to remove their stakes in case of of a potential hacks.
     function emergencyWithdraw() external onlyDuringEmergency {
         claimRewards();
@@ -608,6 +617,7 @@ contract LiquidityPool is ILiquidityPool {
                 IERC20(TST).safeTransfer(msg.sender, totalTst);
             }
         }
+
         deletePosition(msg.sender);
         delete pendingStakes[msg.sender];
 

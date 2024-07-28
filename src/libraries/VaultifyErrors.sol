@@ -11,6 +11,8 @@ library VaultifyErrors {
     error NotEnoughEthBalance();
     error EmergencyStateNotActive();
     error EmergencyStateIsActive();
+    error NoRewardsToClaim();
+    error stakerDoesNotExist();
     error NothingToRepay();
     error ZeroAmountNotAllowed();
     error NotEnoughTokenBalance();

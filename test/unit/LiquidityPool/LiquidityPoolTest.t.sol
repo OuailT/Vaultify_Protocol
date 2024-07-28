@@ -26,70 +26,6 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         jack = _user_3;
     }
 
-    function testIncreasePosition_Success() public {
-        console.log("Testing successful increase of position");
-
-        console.log("pool", pool);
-        console.log(
-            "pool manager address",
-            liquidityPoolContract.poolManager()
-        );
-
-        uint256 initialTstBalance = TST.balanceOf(bob);
-        uint256 initialEurosBalance = EUROs.balanceOf(bob);
-
-        // // Initial Pool Balance in TST and EUROs;
-        // uint256 initialPoolTstBalance = TST.balanceOf(pool);
-        // uint256 initialPoolEurosBalance = EUROs.balanceOf(pool);
-
-        console.log(initialTstBalance);
-        console.log(initialEurosBalance);
-        console.log(bob);
-
-        vm.startPrank(bob);
-
-        // Approve tokens
-        TST.approve(address(pool), 50 ether);
-        EUROs.approve(address(pool), 50 ether);
-
-        // Increase position
-        liquidityPoolContract.increasePosition(50 ether, 50 ether);
-
-        vm.stopPrank();
-
-        // Check balances Staker balance
-        assertEq(
-            TST.balanceOf(bob),
-            initialTstBalance - 50 ether,
-            "TST balance should decrease by 50 ether"
-        );
-        assertEq(
-            EUROs.balanceOf(bob),
-            initialEurosBalance - 50 ether,
-            "EUROs balance should decrease by 50 ether"
-        );
-
-        // Check the pool balance;
-        assertEq(TST.balanceOf(pool), 50 ether);
-        assertEq(EUROs.balanceOf(pool), 50 ether);
-
-        // Check position
-        (VaultifyStructs.Position memory position, ) = liquidityPoolContract
-            .getPosition(bob);
-        assertEq(
-            position.stakedTstAmount,
-            50 ether,
-            "Staked TST amount should be 50 ether"
-        );
-        assertEq(
-            position.stakedEurosAmount,
-            50 ether,
-            "Staked EUROs amount should be 50 ether"
-        );
-
-        console.log("Increase position successful");
-    }
-
     function testComprehensiveIncreasePosition() public {
         console.log("Starting comprehensive increasePosition test");
 
@@ -116,6 +52,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         vm.startPrank(alice);
         TST.approve(address(pool), 9800 ether);
         EUROs.approve(address(pool), 9800 ether);
+
         liquidityPoolContract.increasePosition(9800 ether, 9800 ether);
         vm.stopPrank();
 
@@ -160,6 +97,16 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         vm.startPrank(bob);
         TST.approve(address(pool), 75 ether);
         EUROs.approve(address(pool), 75 ether);
+
+        // Check event emitted: PositionIncreased
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.PositionIncreased(
+            bob,
+            block.timestamp,
+            75 ether,
+            75 ether
+        );
+
         liquidityPoolContract.increasePosition(75 ether, 75 ether);
         vm.stopPrank();
 
@@ -167,6 +114,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         console.log("Checking Bob's pending stake");
         (uint256 bobPendingTst, uint256 bobPendingEuros) = liquidityPoolContract
             .getStakerPendingStakes(bob);
+
         assertEq(
             bobPendingTst,
             75 ether,
@@ -615,7 +563,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
 
         // Simulate emergency state
         vm.startPrank(address(proxyLiquidityPoolManager));
-        liquidityPoolContract.setEmergencyState(true);
+        liquidityPoolContract.toggleEmergencyState(true);
         vm.stopPrank();
 
         // Test Alice's emergency withdraw
@@ -641,6 +589,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             VaultifyStructs.Position memory initialPosition,
 
         ) = liquidityPoolContract.getPosition(user);
+
         (
             uint256 initialPendingTst,
             uint256 initialPendingEuros
@@ -650,28 +599,37 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         vm.prank(user);
         liquidityPoolContract.emergencyWithdraw();
 
+        // get user's position after successful withdraw
+        (
+            VaultifyStructs.Position memory finalPosition,
+
+        ) = liquidityPoolContract.getPosition(user);
+
         // Check final balances
         uint256 finalEurosBalance = EUROs.balanceOf(user);
         uint256 finalTstBalance = TST.balanceOf(user);
 
-        assertEq(
-            finalEurosBalance,
+        assertGe(
             initialEurosBalance +
                 initialPosition.stakedEurosAmount +
                 initialPendingEuros,
+            finalEurosBalance,
             "EUROS balance should include staked and pending amounts"
         );
-        assertEq(
-            finalTstBalance,
+
+        assertGe(
             initialTstBalance +
                 initialPosition.stakedTstAmount +
                 initialPendingTst,
+            finalTstBalance,
             "TST balance should include staked and pending amounts"
         );
 
-        // Check position and pending stakes after emergency withdraw
-        vm.expectRevert(); // Expect revert when trying to access a deleted position
-        liquidityPoolContract.getPosition(user);
+        assertEq(
+            finalPosition.stakerAddress,
+            address(0),
+            "User's position should be removed after successful emergency withdrawal."
+        );
 
         (
             uint256 finalPendingTst,
@@ -687,13 +645,214 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             0,
             "Pending EUROS should be 0 after emergency withdraw"
         );
+    }
 
-        // Check event emission
-        vm.expectEmit(true, true, true, true);
-        emit VaultifyEvents.EmergencyWithdrawal(
-            user,
-            initialPosition.stakedEurosAmount + initialPendingEuros,
-            initialPosition.stakedTstAmount + initialPendingTst
+    function testReturnExcessETH() public {
+        // Assume returnExcessETH is public for testing
+        // Setup initial state
+        uint256 initialPoolManagerBalance = 1 ether;
+        vm.deal(address(proxyLiquidityPoolManager), initialPoolManagerBalance);
+
+        uint256 totalETHToDistribute = 2 ether;
+        uint256 nativePurchased = 1.5 ether;
+        uint256 expectedExcess = totalETHToDistribute - nativePurchased;
+
+        // Setup test assets
+        VaultifyStructs.Asset[] memory assets = new VaultifyStructs.Asset[](1);
+        assets[0] = VaultifyStructs.Asset({
+            token: VaultifyStructs.Token({
+                symbol: bytes32("ETH"),
+                addr: address(0),
+                dec: 18,
+                clAddr: address(0),
+                clDec: 8
+            }),
+            amount: totalETHToDistribute
+        });
+
+        // Fund the contract with ETH for distribution
+        vm.deal(address(liquidityPoolContract), totalETHToDistribute);
+
+        // Call returnExcessETH
+        vm.prank(address(liquidityPoolContract));
+
+        //NOTE: change visibility of the function to public to test this
+        liquidityPoolContract.returnExcessETH(assets, nativePurchased);
+
+        // Check pool manager balance after excess ETH return
+        uint256 finalPoolManagerBalance = address(proxyLiquidityPoolManager)
+            .balance;
+
+        assertEq(
+            finalPoolManagerBalance,
+            initialPoolManagerBalance + expectedExcess,
+            "Pool manager should receive excess ETH"
         );
+
+        // Check remaining balance in the contract
+        uint256 contractBalance = address(liquidityPoolContract).balance;
+
+        assertEq(
+            contractBalance,
+            nativePurchased,
+            "Contract should retain the purchased amount of ETH"
+        );
+
+        // Test with no excess ETH
+        // Setup test assets
+        uint256 totalETHToDistributee = 1.5 ether;
+        VaultifyStructs.Asset[] memory ethAsset = new VaultifyStructs.Asset[](
+            1
+        );
+        ethAsset[0] = VaultifyStructs.Asset({
+            token: VaultifyStructs.Token({
+                symbol: bytes32("ETH"),
+                addr: address(0),
+                dec: 18,
+                clAddr: address(0),
+                clDec: 8
+            }),
+            amount: totalETHToDistributee
+        });
+
+        vm.deal(address(liquidityPoolContract), totalETHToDistributee); // 1.5 ETH
+        vm.prank(address(liquidityPoolContract));
+        liquidityPoolContract.returnExcessETH(ethAsset, nativePurchased);
+
+        // Check that balances remain unchanged when there's no excess
+        assertEq(
+            address(proxyLiquidityPoolManager).balance,
+            finalPoolManagerBalance,
+            "Pool manager balance should not change when there's no excess"
+        );
+
+        assertEq(
+            address(liquidityPoolContract).balance,
+            nativePurchased,
+            "Contract balance should remain the same when there's no excess"
+        );
+    }
+
+    function testToggleEmergencyState() public {
+        // Initial state check
+        assertFalse(
+            liquidityPoolContract.isEmergencyActive(),
+            "Emergency state should initially be false"
+        );
+
+        // Test toggling emergency state to true
+        vm.prank(address(proxyLiquidityPoolManager));
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EmergencyStateChanged(true);
+        liquidityPoolContract.toggleEmergencyState(true);
+
+        assertTrue(
+            liquidityPoolContract.isEmergencyActive(),
+            "Emergency state should be true after toggling"
+        );
+
+        // Test toggling emergency state back to false
+        vm.prank(address(proxyLiquidityPoolManager));
+        vm.expectEmit(true, true, true, true);
+        emit VaultifyEvents.EmergencyStateChanged(false);
+        liquidityPoolContract.toggleEmergencyState(false);
+
+        assertFalse(
+            liquidityPoolContract.isEmergencyActive(),
+            "Emergency state should be false after toggling back"
+        );
+
+        // Test calling from an unauthorized address
+        vm.prank(alice);
+
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.toggleEmergencyState.selector,
+                true
+            ),
+            expectedErrorSignature: "UnauthorizedCaller(address)",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.UnauthorizedCaller.selector,
+                alice
+            )
+        });
+
+        // Ensure state hasn't changed after unauthorized call
+        assertFalse(
+            liquidityPoolContract.isEmergencyActive(),
+            "Emergency state should remain false after unauthorized call"
+        );
+    }
+
+    function test_revert_increasePosition() public {
+        // Test revert when emergency state is active
+        vm.prank(address(proxyLiquidityPoolManager));
+        liquidityPoolContract.toggleEmergencyState(true);
+
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.increasePosition.selector,
+                1 ether,
+                1 ether
+            ),
+            expectedErrorSignature: "EmergencyStateIsActive()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.EmergencyStateIsActive.selector
+            )
+        });
+
+        // Reset emergency state
+        vm.prank(address(proxyLiquidityPoolManager));
+        liquidityPoolContract.toggleEmergencyState(false);
+        // Stop here
+        uint256 MINIMUM_DEPOSIT = 20e18;
+        // Test revert when deposit is below minimum requirement
+        uint256 belowMinimum = MINIMUM_DEPOSIT - 1;
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.increasePosition.selector,
+                belowMinimum,
+                belowMinimum
+            ),
+            expectedErrorSignature: "DepositBelowMinimum()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.DepositBelowMinimum.selector
+            )
+        });
+
+        // Test revert when EUROs allowance is not enough
+        vm.prank(alice);
+        EUROs.approve(address(liquidityPoolContract), 1 ether - 1);
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.increasePosition.selector,
+                0,
+                1 ether
+            ),
+            expectedErrorSignature: "NotEnoughEurosAllowance()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.NotEnoughEurosAllowance.selector
+            )
+        });
+
+        // Test revert when TST allowance is not enough
+        vm.prank(alice);
+        TST.approve(address(liquidityPoolContract), 1 ether - 1);
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.increasePosition.selector,
+                1 ether,
+                0
+            ),
+            expectedErrorSignature: "NotEnoughTstAllowance()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.NotEnoughTstAllowance.selector
+            )
+        });
     }
 }

@@ -322,8 +322,12 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.startPrank(_owner);
         EUROs.approve(address(vault), repayAmount);
 
-        vm.expectEmit(true, true, true, true);
-        emit VaultifyEvents.EUROsBurned(repayAmount - repayFee, repayFee);
+        vm.expectEmit(true, true, false, true);
+        emit VaultifyEvents.EUROsBurned(
+            _owner,
+            repayAmount - repayFee,
+            repayFee
+        );
 
         vault.repay(repayAmount);
 
@@ -378,8 +382,9 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
 
         EUROs.approve(address(vault), fullRepayAmount);
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(true, true, false, true);
         emit VaultifyEvents.EUROsBurned(
+            _owner,
             fullRepayAmount - fullRepayFee,
             fullRepayFee
         );
@@ -447,8 +452,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         vm.startPrank(_owner);
         EUROs.approve(address(vault), repayAmount);
 
-        vm.expectEmit(true, true, true, true);
-        emit VaultifyEvents.EUROsBurned(repayAmount - burnFee, burnFee);
+        vm.expectEmit(true, true, false, true);
+        emit VaultifyEvents.EUROsBurned(_owner, repayAmount - burnFee, burnFee);
 
         vault.repay(repayAmount);
 
@@ -652,8 +657,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         uint256 fee = (repayAmount * proxySmartVaultManager.burnFeeRate()) /
             proxySmartVaultManager.HUNDRED_PRC();
 
-        vm.expectEmit(true, true, true, true);
-        emit VaultifyEvents.EUROsBurned(repayAmount - fee, fee);
+        vm.expectEmit(true, true, false, true);
+        emit VaultifyEvents.EUROsBurned(_owner, repayAmount - fee, fee);
 
         vault.repay(repayAmount);
         vm.stopPrank();

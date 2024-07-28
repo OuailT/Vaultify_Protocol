@@ -104,7 +104,6 @@ contract LiquidationPoolManager is
 
     function relayLiquidatedAssetsToPool() internal {
         bool assetsAllocated;
-        // 1- Liquidate the vault that is under collatralized
         // Liquidation poool manager receives assets that has being liquidated from smart vault
         ISmartVaultManager vaultManager = ISmartVaultManager(smartVaultManager);
 

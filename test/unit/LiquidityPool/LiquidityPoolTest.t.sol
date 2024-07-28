@@ -286,7 +286,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             );
 
             // NOTE: The bellow min rewards are calculated using "distributeLiquatedAssets"
-            // Bob only could only purchased liquidated WBTC
+            // Bob he could only purchased liquidated WBTC
             uint256 bobMinWbtcReward = 244241; // 244241 / 1e8 = 0.00244241 WBTC
 
             // Bob claims rewards
@@ -419,7 +419,6 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         liquidityPoolContract.decreasePosition(bobHalfTst, bobHalfEuros);
         vm.stopPrank();
 
-        // HERE
         console.log("Checking rewards for Bob after decrease");
         /** Check alice balance for Bob before decrease*/
         uint256 bobBalanceInWBTCBef = WBTC.balanceOf(bob);
@@ -810,6 +809,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         uint256 MINIMUM_DEPOSIT = 20e18;
         // Test revert when deposit is below minimum requirement
         uint256 belowMinimum = MINIMUM_DEPOSIT - 1;
+
         _expectRevertWithCustomError({
             target: address(liquidityPoolContract),
             callData: abi.encodeWithSelector(
@@ -823,36 +823,72 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
             )
         });
 
-        // Test revert when EUROs allowance is not enough
+        // Test revert when EUROs  and TST allowances are not enough
         vm.prank(alice);
-        EUROs.approve(address(liquidityPoolContract), 1 ether - 1);
+        EUROs.approve(address(liquidityPoolContract), 20 ether - 1);
+        EUROs.approve(address(liquidityPoolContract), 20 ether - 1);
         _expectRevertWithCustomError({
             target: address(liquidityPoolContract),
             callData: abi.encodeWithSelector(
                 liquidityPoolContract.increasePosition.selector,
-                0,
-                1 ether
+                20 ether,
+                20 ether
             ),
             expectedErrorSignature: "NotEnoughEurosAllowance()",
             errorData: abi.encodeWithSelector(
                 VaultifyErrors.NotEnoughEurosAllowance.selector
             )
         });
+    }
 
-        // Test revert when TST allowance is not enough
-        vm.prank(alice);
-        TST.approve(address(liquidityPoolContract), 1 ether - 1);
+    function test_revert_decreasePosition() public {
+        // Test revert when emergency state is active
+        vm.prank(address(proxyLiquidityPoolManager));
+        liquidityPoolContract.toggleEmergencyState(true);
+
         _expectRevertWithCustomError({
             target: address(liquidityPoolContract),
             callData: abi.encodeWithSelector(
                 liquidityPoolContract.increasePosition.selector,
                 1 ether,
-                0
+                1 ether
             ),
-            expectedErrorSignature: "NotEnoughTstAllowance()",
+            expectedErrorSignature: "EmergencyStateIsActive()",
             errorData: abi.encodeWithSelector(
-                VaultifyErrors.NotEnoughTstAllowance.selector
+                VaultifyErrors.EmergencyStateIsActive.selector
             )
         });
+    }
+
+    function test_revert_emergencyWithdraw() public {
+        // Test revert when emergency withdraw is not active
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.emergencyWithdraw.selector
+            ),
+            expectedErrorSignature: "EmergencyStateNotActive()",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.EmergencyStateNotActive.selector
+            )
+        });
+    }
+
+    function test_revert_distributeRewardFees() public {
+        // allow alice to distributeRewardsFees
+        vm.startPrank(alice);
+        _expectRevertWithCustomError({
+            target: address(liquidityPoolContract),
+            callData: abi.encodeWithSelector(
+                liquidityPoolContract.distributeRewardFees.selector,
+                200 ether
+            ),
+            expectedErrorSignature: "UnauthorizedCaller(address)",
+            errorData: abi.encodeWithSelector(
+                VaultifyErrors.UnauthorizedCaller.selector,
+                alice
+            )
+        });
+        vm.stopPrank();
     }
 }

@@ -285,7 +285,7 @@ contract SmartVault is ISmartVault {
         uint EthBal = address(this).balance;
         // Check if the vault has enough ETH balance
         if (EthBal != 0) {
-            (bool succ, ) = payable(smartVaultManager.protocolTreasury()).call{
+            (bool succ, ) = payable(smartVaultManager.liquidator()).call{
                 value: EthBal
             }("");
             if (!succ) revert VaultifyErrors.NativeTxFailed();
@@ -300,7 +300,7 @@ contract SmartVault is ISmartVault {
         uint256 Erc20Bal = _token.balanceOf(address(this));
         // Check if the contract has enough balance for the specific token
         if (_token.balanceOf(address(this)) != 0) {
-            _token.safeTransfer(smartVaultManager.protocolTreasury(), Erc20Bal);
+            _token.safeTransfer(smartVaultManager.liquidator(), Erc20Bal);
         }
     }
 
@@ -332,7 +332,7 @@ contract SmartVault is ISmartVault {
 
         EUROs.mint(_to, amountToMint);
 
-        EUROs.mint(smartVaultManager.protocolTreasury(), fee);
+        EUROs.mint(smartVaultManager.liquidator(), fee);
 
         emit VaultifyEvents.EUROsMinted(_to, amountToMint, fee);
     }
@@ -377,7 +377,7 @@ contract SmartVault is ISmartVault {
 
         IERC20(address(EUROs)).safeTransferFrom(
             msg.sender,
-            smartVaultManager.protocolTreasury(),
+            smartVaultManager.liquidator(),
             fee
         );
 
@@ -480,8 +480,8 @@ contract SmartVault is ISmartVault {
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
     ) private returns (uint256 amountOut) {
-        // Send fees to protocolTreasury
-        (bool succ, ) = payable(smartVaultManager.protocolTreasury()).call{
+        // Send fees to liquidator
+        (bool succ, ) = payable(smartVaultManager.liquidator()).call{
             value: _swapFee
         }("");
 
@@ -509,9 +509,9 @@ contract SmartVault is ISmartVault {
         ISwapRouter.ExactInputSingleParams memory _params,
         uint256 _swapFee
     ) private returns (uint256 amountOut) {
-        // Send fees to protocolTreasury
+        // Send fees to liquidator
         IERC20(_params.tokenIn).safeTransfer(
-            smartVaultManager.protocolTreasury(),
+            smartVaultManager.liquidator(),
             _swapFee
         );
 

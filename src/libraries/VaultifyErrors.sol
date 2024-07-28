@@ -7,6 +7,7 @@ library VaultifyErrors {
     error InvalidPrice();
 
     //*** SmartVault.sol Erros  ***//
+    error DepositBelowMinimum();
     error InsufficientBalance(address caller, uint256 balance, uint256 amount);
     error NotEnoughEthBalance();
     error EmergencyStateNotActive();

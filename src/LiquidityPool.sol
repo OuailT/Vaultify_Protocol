@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import {ISmartVaultManager} from "src/interfaces/ISmartVaultManager.sol";
 import {IEUROs} from "src/interfaces/IEUROs.sol";
@@ -17,7 +18,7 @@ import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 
 /// @title Liquidity Pool Contract
 /// @notice This contract manages liquidated assets and distributing them to stakestakers
-contract LiquidityPool is ILiquidityPool {
+contract LiquidityPool is ILiquidityPool, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address private immutable TST;
@@ -82,17 +83,12 @@ contract LiquidityPool is ILiquidityPool {
         uint256 _tstVal,
         uint256 _eurosVal
     ) external onlyWhenNotEmergency {
-        require(
-            _tstVal >= MINIMUM_DEPOSIT || _eurosVal >= MINIMUM_DEPOSIT,
-            "Deposit must exceed minimum requirement"
-        );
-
         if (_tstVal < MINIMUM_DEPOSIT || _eurosVal < MINIMUM_DEPOSIT)
-            // Check if the contract has allowance to transfer both tokens
-            bool isTstApproved = IERC20(TST).allowance(
-                msg.sender,
-                address(this)
-            ) >= _tstVal;
+            revert VaultifyErrors.DepositBelowMinimum();
+
+        // Check if the contract has allowance to transfer both tokens
+        bool isTstApproved = IERC20(TST).allowance(msg.sender, address(this)) >=
+            _tstVal;
 
         bool isEurosApproved = IERC20(EUROs).allowance(
             msg.sender,
@@ -586,9 +582,8 @@ contract LiquidityPool is ILiquidityPool {
         _rewards = getStakerRewards(_staker);
     }
 
-    // TODO: add re entrancy modifier
-    // function that allow user to remove their stakes in case of of a potential hacks.
-    function emergencyWithdraw() external onlyDuringEmergency {
+    /// @notice Allows users to withdraw all their staked tokens during an emergency state
+    function emergencyWithdraw() external onlyDuringEmergency nonReentrant {
         claimRewards();
 
         VaultifyStructs.Position memory _position = positions[msg.sender];

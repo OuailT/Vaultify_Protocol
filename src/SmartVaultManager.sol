@@ -33,7 +33,7 @@ contract SmartVaultManager is
     uint256 public constant HUNDRED_PRC = 1e5;
 
     address public protocolTreasury;
-    address public liquidator;
+    address public liquidator; //=> liquidityPoolManager
     address public euros;
     uint256 public collateralRate;
     address public tokenManager;
@@ -196,8 +196,6 @@ contract SmartVaultManager is
             revert("other-liquidation-error");
         }
     }
-
-    // Liquidate vault(); todo later;
 
     // setter functions //
     function totalSupply() external view returns (uint256) {

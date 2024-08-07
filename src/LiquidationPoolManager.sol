@@ -72,6 +72,7 @@ contract LiquidationPoolManager is
         );
     }
 
+    // @audit change visibility to private later
     // @audit-info consolidateFees before feedistribution.
     function distributeEurosFees() public {
         IERC20 eurosTokens = IERC20(EUROs);
@@ -102,7 +103,8 @@ contract LiquidationPoolManager is
         relayLiquidatedAssetsToPool();
     }
 
-    function relayLiquidatedAssetsToPool() internal {
+    // @audit change visibility to private later
+    function relayLiquidatedAssetsToPool() public {
         bool assetsAllocated;
         // Liquidation poool manager receives assets that has being liquidated from smart vault
         ISmartVaultManager vaultManager = ISmartVaultManager(smartVaultManager);

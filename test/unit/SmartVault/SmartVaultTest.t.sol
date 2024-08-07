@@ -10,6 +10,16 @@ import {VaultifyErrors} from "src/libraries/VaultifyErrors.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import "forge-std/console.sol";
 
+/**
+
+Encountered 5 failing tests in test/unit/SmartVault/SmartVaultTest.t.sol:SmartVaultTest
+[FAIL. Reason: assertion failed] test_FullRepayment() (gas: 3560277)
+[FAIL. Reason: assertion failed] test_RepayAndBorrowAgain() (gas: 3535248)
+[FAIL. Reason: assertion failed] test_SuccessfulLiquidationOfUndercollateralizedVault() (gas: 3636404)
+[FAIL. Reason: assertion failed] test_SuccessfulRepay() (gas: 3479370)
+[FAIL. Reason: revert: Expected revert due to InsufficientBalance(address,uint256,uint256) but got success] test_revert_repay_insufficientBalance() (gas: 3381956)
+
+ */
 contract SmartVaultTest is HelperTest, ExpectRevert {
     function setUp() public override {
         super.setUp();
@@ -63,7 +73,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         );
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
+            EUROs.balanceOf(address(proxyLiquidityPoolManager)),
             fee,
             "Liquidator's balance should be equal to the fee"
         );
@@ -112,7 +122,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             "Total collateral value should remain the same"
         );
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
+            EUROs.balanceOf(address(proxyLiquidityPoolManager)),
             fee,
             "Liquidator's balance should be equal to the fee"
         );
@@ -127,6 +137,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
+        uint256 InitialBalanceBeforeBorrow = EUROs.balanceOf(_owner); // 100 EUROS from fundsWallet functions
+
         // Step 2: Get initial status of the vault
         VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
         uint256 initialMaxMintableEuro = initialStatus.maxBorrowableEuros;
@@ -134,11 +146,20 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
 
         vm.startPrank(_owner);
 
+        // borrower balance
+
         // Step 3: Borrow a specific amount and check fee deduction
         uint256 borrowAmount = 50000 * 1e18;
 
         uint256 fee = (borrowAmount * proxySmartVaultManager.mintFeeRate()) /
             proxySmartVaultManager.HUNDRED_PRC();
+
+        console.log("Borrow Amount:", borrowAmount);
+        console.log("Calculated Fee:", fee);
+        console.log(
+            "Expected Balance (borrowAmount - fee):",
+            borrowAmount - fee
+        );
 
         vm.expectEmit(true, true, true, true);
         emit VaultifyEvents.EUROsMinted(_owner, borrowAmount - fee, fee);
@@ -147,16 +168,21 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
 
         // Step 4: Get new status of the vault
         VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
+
+        uint256 actualBalance = EUROs.balanceOf(_owner);
+        console.log("Actual Balance:", actualBalance);
+
         assertEq(
             newStatus.borrowedAmount,
             borrowAmount - fee,
             "Borrowed amount should be equal to the specified borrow amount"
         );
 
+        uint256 expectedBalance = borrowAmount - fee;
         assertEq(
-            EUROs.balanceOf(_owner),
-            borrowAmount - fee,
-            "Fee isn't deducted correctly"
+            actualBalance,
+            (expectedBalance + InitialBalanceBeforeBorrow),
+            "Borrower's balance should be equal to the borrow amount minus fee"
         );
 
         vm.stopPrank();
@@ -168,6 +194,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         // Step 1: Mint a vault and transfer collateral
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
+
+        uint256 InitialBalanceBeforeBorrow = EUROs.balanceOf(_owner);
 
         // Step 2: Get initial status of the vault
         VaultifyStructs.VaultStatus memory initialStatus = vault.vaultStatus();
@@ -193,18 +221,21 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
 
         // Step 4: Get new status of the vault
         VaultifyStructs.VaultStatus memory newStatus = vault.vaultStatus();
+
+        uint256 actualBalance = EUROs.balanceOf(_owner);
+
         assertEq(
             newStatus.borrowedAmount,
             totalBorrowed - totalFee,
             "Borrowed amount should be equal to the total borrowed amount - totalFee"
         );
         assertEq(
-            EUROs.balanceOf(_owner),
-            totalBorrowed - totalFee,
+            actualBalance,
+            (totalBorrowed - totalFee) + InitialBalanceBeforeBorrow,
             "Owner's balance should be total borrowed amount minus total fee"
         );
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
+            EUROs.balanceOf(address(proxyLiquidityPoolManager)),
             totalFee,
             "Liquidator's balance should be equal to the total fee"
         );
@@ -300,6 +331,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
+        uint256 InitialBalanceBeforeBorrow = EUROs.balanceOf(_owner); // 100 EUROS from fundsWallet functions
+
         // Step 2: Borrow some EUROs to have an initial balance
         uint256 borrowAmount = 50000 * 1e18;
         uint256 borrowFee = (borrowAmount *
@@ -334,12 +367,12 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         // Step 4: Verify the balances
         assertEq(
             EUROs.balanceOf(_owner),
-            _ownerBorrowedBalance - repayAmount,
+            (_ownerBorrowedBalance - repayAmount) + InitialBalanceBeforeBorrow,
             "_owner balance after repaying is not correct"
         );
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
+            EUROs.balanceOf(address(proxyLiquidityPoolManager)),
             repayFee + borrowFee,
             "Liquidator balance after repaying is not correct"
         );
@@ -361,6 +394,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         // Step 1: Create a vault and transfer collateral
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
+
+        uint256 InitialBalanceBeforeBorrow = EUROs.balanceOf(_owner); // 100 EUROS from fundsWallet functions
 
         // Step 2: Borrow some EUROs
         uint256 borrowAmount = 50000 * 1e18;
@@ -394,12 +429,13 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         // Step 4: Verify the balances after full repayment
         assertEq(
             EUROs.balanceOf(_owner),
-            actualBorrowedAmount - fullRepayAmount,
+            (actualBorrowedAmount - fullRepayAmount) +
+                InitialBalanceBeforeBorrow,
             "_owner balance after full repayment is not correct"
         );
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
+            EUROs.balanceOf(address(proxyLiquidityPoolManager)),
             borrowFee + fullRepayFee,
             "Liquidator balance after full repayment is not correct"
         );
@@ -421,6 +457,8 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         // Step 1: Mint a vault and transfer collateral
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
+
+        uint256 InitialBalanceBeforeBorrow = EUROs.balanceOf(_owner); // 100 EUROS from fundsWallet functions
 
         // Step 2: Borrow some EUROs to have an initial balance
         uint256 borrowAmount = 20000 * 1e18;
@@ -475,7 +513,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
 
         assertEq(
             EUROs.balanceOf(_owner),
-            expected_ownerBalance,
+            expected_ownerBalance + InitialBalanceBeforeBorrow,
             "_owner balance after borrowing again is not correct"
         );
 
@@ -484,7 +522,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             additionalMintFee;
 
         assertEq(
-            EUROs.balanceOf(proxySmartVaultManager.protocolTreasury()),
+            EUROs.balanceOf(address(proxyLiquidityPoolManager)),
             expectedLiquidatorBalance,
             "Liquidator balance after borrowing again is not correct"
         );
@@ -612,15 +650,36 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];
 
+        // _owner balance by default is 100 EUROS. transfer 95 EUROS to jack wallter
+        // to start the this test with 5 EUROS.
+
+        console.log(
+            "Owner balance before transfer",
+            EUROs.balanceOf(_owner) / 1e18
+        );
+
+        vm.startPrank(_owner);
+        EUROs.transfer(jack, 100 ether);
+        vm.stopPrank();
+
+        console.log(
+            "Owner balance after transfer",
+            EUROs.balanceOf(_owner) / 1e18
+        );
+
         uint256 borrowAmount = 10 * 1e18;
-        uint256 repayAmount = 5 * 1e18;
+        uint256 repayAmount = 9 * 1e18;
 
         vm.startPrank(_owner);
         vault.borrow(_owner, borrowAmount);
-        EUROs.approve(address(vault), repayAmount);
+        EUROs.transfer(jack, 8 ether);
 
-        // Transfer to alice to create insufficient balance
-        EUROs.transfer(alice, 9 * 1e18);
+        console.log(
+            "Owner balance after borrow",
+            EUROs.balanceOf(_owner) / 1e18
+        );
+
+        EUROs.approve(address(vault), repayAmount);
 
         // Calculate the fee and total repayment
         uint256 fee = (repayAmount * proxySmartVaultManager.burnFeeRate()) /
@@ -1348,7 +1407,7 @@ contract SmartVaultTest is HelperTest, ExpectRevert {
             "Testing successful liquidation of an undercollateralized vault"
         );
 
-        address vaultLiquidator = proxySmartVaultManager.protocolTreasury();
+        address vaultLiquidator = proxySmartVaultManager.liquidator();
 
         (ISmartVault[] memory _vaults, address _owner) = createVaultOwners(1);
         vault = _vaults[0];

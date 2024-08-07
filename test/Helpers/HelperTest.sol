@@ -101,6 +101,7 @@ abstract contract HelperTest is Test {
     uint256 public burnFeeRate = 2000; // 2%
     uint32 public poolFeePercentage = 50000; // 50%;
     uint256 public swapFeeRate = 1000; // 1%
+    uint256 public lastTokenId; // Vault token ID
 
     bytes32 public native;
 
@@ -275,6 +276,10 @@ abstract contract HelperTest is Test {
         // set liquidator to liquidation pool manager contract
         liquidator = address(proxyLiquidityPoolManager);
 
+        liquidationPoolManagerContract = ILiquidationPoolManager(
+            proxyLiquidityPoolManager
+        );
+
         // // // Set actors
         proxySmartVaultManager.setLiquidatorAddress(
             address(proxyLiquidityPoolManager)
@@ -350,6 +355,7 @@ abstract contract HelperTest is Test {
                 .mintNewVault();
 
             vault = ISmartVault(vaultAddr);
+            lastTokenId = tokenId;
 
             // 2- Transfer collateral (Native, WBTC, and PAXG) to the vault
             // Transfer 10 ETH @ $2200, 1 BTC @ $42000, 10 PAXG @ $2000

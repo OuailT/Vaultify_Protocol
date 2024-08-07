@@ -6,6 +6,7 @@ import {ExpectRevert} from "../../Helpers/ExpectRevert.sol";
 import {VaultifyStructs} from "src/libraries/VaultifyStructs.sol";
 import {VaultifyEvents} from "src/libraries/VaultifyEvents.sol";
 import {VaultifyErrors} from "src/libraries/VaultifyErrors.sol";
+import {ISmartVault} from "src/interfaces/ISmartVault.sol";
 import "forge-std/console.sol";
 
 // NOTE: alicePosition.stakedEurosAmount = 50 EUROS staked + FeesDistribution - CosttoBuyLiquidatedAssets;
@@ -150,7 +151,9 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         );
 
         // Check protocol treasury balance
-        uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        uint256 treasuryBalance = EUROs.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
         assertTrue(
             treasuryBalance > 0,
             "Treasury should have received some fees"
@@ -305,7 +308,7 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         }
 
         // Check protocol treasury balance
-        treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        treasuryBalance = EUROs.balanceOf(address(proxyLiquidityPoolManager));
         assertTrue(
             treasuryBalance > 0,
             "Treasury should have received some fees"
@@ -539,7 +542,9 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         vm.stopPrank();
 
         // Check protocol treasury balance
-        uint256 treasuryBalance = EUROs.balanceOf(protocolTreasury);
+        uint256 treasuryBalance = EUROs.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
         assertTrue(
             treasuryBalance > 0,
             "Treasury should have received some fees"
@@ -891,4 +896,206 @@ contract LiquidityPoolTest is HelperTest, ExpectRevert {
         });
         vm.stopPrank();
     }
+
+    function testComprehensiveExecuteLiquidation() public {
+        console.log("Starting comprehensive executeLiquidation test");
+
+        // Setup initial state
+        (ISmartVault[] memory vaults, address owner) = createVaultOwners(1);
+        ISmartVault vault = vaults[0];
+        uint256 tokenId = lastTokenId;
+
+        // Borrow and undercollateralize the vault
+        _undercollateralizeVault(vault, owner);
+
+        // Setup liquidation pool
+        _setupLiquidationPool();
+
+        // Store initial balances
+        uint256 initialPoolEthBalance = address(proxyLiquidityPoolManager)
+            .balance;
+        uint256 initialPoolWbtcBalance = WBTC.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
+        uint256 initialPoolPaxgBalance = PAXG.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
+
+        uint256 initialvaultlEthBalance = address(vault).balance;
+        uint256 initialvaultlWbtcBalance = WBTC.balanceOf(address(vault));
+        uint256 initialvaultlPaxgBalance = PAXG.balanceOf(address(vault));
+
+        // Execute liquidation
+        vm.prank(address(proxyLiquidityPoolManager));
+        liquidationPoolManagerContract.executeLiquidation(tokenId);
+
+        uint256 FinalPoolEthBalance = address(proxyLiquidityPoolManager)
+            .balance;
+        uint256 FinalPoolWbtcBalance = WBTC.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
+        uint256 FinalPoolPaxgBalance = PAXG.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
+
+        console.log("Final LiquidityPoolPool Eth Balance", FinalPoolEthBalance);
+        console.log(
+            "Final LiquidityPoolPool Wbtc Baance",
+            FinalPoolWbtcBalance
+        );
+        console.log(
+            "Final LiquidityPoolPool Paxg Balance",
+            FinalPoolPaxgBalance
+        );
+
+        uint256 FinalpoollEthBalance = address(pool).balance;
+        uint256 FinalpoollWbtcBalance = WBTC.balanceOf(address(pool));
+        uint256 FinalpoollPaxgBalance = PAXG.balanceOf(address(pool));
+
+        console.log(
+            "Final Pool Eth Balance after distribution",
+            FinalpoollEthBalance
+        );
+        console.log(
+            "Final Pool Wbtc Balance after distribution",
+            FinalpoollWbtcBalance
+        );
+        console.log(
+            "Final Pool Paxg Balance after distribution",
+            FinalpoollPaxgBalance
+        );
+
+        // Verify liquidation results
+        _verifyLiquidationResults(
+            vault,
+            initialPoolEthBalance,
+            initialPoolWbtcBalance,
+            initialPoolPaxgBalance
+        );
+
+        console.log(
+            "Comprehensive executeLiquidation test completed successfully"
+        );
+    }
+
+    function _undercollateralizeVault(
+        ISmartVault vault,
+        address owner
+    ) private {
+        VaultifyStructs.VaultStatus memory statusBeforeLiquidation = vault
+            .vaultStatus();
+        uint256 maxBorrowableEuros = statusBeforeLiquidation.maxBorrowableEuros;
+        uint256 amountToBorrow = (maxBorrowableEuros * 98) / 100;
+
+        console.log("maximum amount to borrow ", maxBorrowableEuros);
+        console.log("Amount to borrow ", amountToBorrow);
+        vm.startPrank(owner);
+        vault.borrow(owner, amountToBorrow);
+        vm.stopPrank();
+
+        // Drop asset prices
+        priceFeedNativeUsd.setPrice(1900 * 1e8);
+        priceFeedwBtcUsd.setPrice(40000 * 1e8);
+    }
+
+    function _setupLiquidationPool() private {
+        // Add stakers to the liquidation pool
+        vm.startPrank(alice);
+        TST.approve(address(pool), 9800 ether);
+        EUROs.approve(address(pool), 9800 ether);
+        liquidityPoolContract.increasePosition(9800 ether, 9800 ether);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        TST.approve(address(pool), 500 ether);
+        EUROs.approve(address(pool), 500 ether);
+        liquidityPoolContract.increasePosition(500 ether, 500 ether);
+        vm.stopPrank();
+    }
+
+    function _verifyLiquidationResults(
+        ISmartVault vault,
+        uint256 initialPoolEthBalance,
+        uint256 initialPoolWbtcBalance,
+        uint256 initialPoolPaxgBalance
+    ) private {
+        // Verify vault state
+        VaultifyStructs.VaultStatus memory statusAfterLiquidation = vault
+            .vaultStatus();
+        assertTrue(
+            statusAfterLiquidation.isLiquidated,
+            "Vault should be marked as liquidated"
+        );
+        assertEq(
+            statusAfterLiquidation.borrowedAmount,
+            0,
+            "Borrowed amount should be zero after liquidation"
+        );
+        assertEq(
+            statusAfterLiquidation.totalCollateralValue,
+            0,
+            "Total collateral value should be zero after liquidation"
+        );
+
+        // Verify pool received liquidated assets
+        assertGt(
+            address(address(proxyLiquidityPoolManager)).balance,
+            initialPoolEthBalance,
+            "Pool should have received ETH"
+        );
+        assertGt(
+            WBTC.balanceOf(address(proxyLiquidityPoolManager)),
+            initialPoolWbtcBalance,
+            "Pool should have received WBTC"
+        );
+        assertGt(
+            PAXG.balanceOf(address(proxyLiquidityPoolManager)),
+            initialPoolPaxgBalance,
+            "Pool should have received PAXG"
+        );
+
+        // // // Verify stakers received rewards
+        // _verifyStakerRewards(alice);
+        // _verifyStakerRewards(bob);
+
+        // Verify fees distribution
+        uint256 treasuryBalance = EUROs.balanceOf(
+            address(proxyLiquidityPoolManager)
+        );
+        assertGt(treasuryBalance, 0, "Treasury should have received fees");
+    }
+
+    // (
+    //         VaultifyStructs.Position memory alicePosition,
+
+    //     ) = liquidityPoolContract.getPosition(alice);
+    // @audit check to get the rewards ater executeliquidation in the same function or as claude to do all the test in the same function
+    // function _verifyStakerRewards(address staker) private {
+    //     (
+    //         VaultifyStructs.Position memory position,
+    //         VaultifyStructs.Reward[] memory rewards
+    //     ) = liquidityPoolContract.getPosition(staker);
+
+    //     console.log("Verifying rewards for staker:", staker);
+    //     console.log("Staked Euro Amount:", position.stakedEurosAmount);
+    //     console.log("Staked TST Amount:", position.stakedTstAmount);
+
+    //     for (uint256 i = 0; i < rewards.length; i++) {
+    //         console.log(
+    //             "Reward for token:",
+    //             string(abi.encodePacked(rewards[i].tokenSymbol)),
+    //             "Amount:",
+    //             rewards[i].rewardAmount
+    //         );
+    //     }
+
+    //     bool hasRewards = false;
+    //     for (uint256 i = 0; i < rewards.length; i++) {
+    //         if (rewards[i].rewardAmount > 0) {
+    //             hasRewards = true;
+    //             break;
+    //         }
+    //     }
+    //     assertTrue(hasRewards, "Staker should have received rewards");
+    // }
 }

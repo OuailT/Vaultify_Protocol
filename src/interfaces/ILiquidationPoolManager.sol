@@ -7,4 +7,5 @@ interface ILiquidationPoolManager {
     function createLiquidityPool() external returns (address);
     function allocateFeesAndAssetsToPool() external;
     function distributeEurosFees() external;
+    function relayLiquidatedAssetsToPool() external;
 }
